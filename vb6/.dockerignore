@@ -1,0 +1,11 @@
+dockerControl.ps1
+
+# git
+.gitignore
+
+# Readme
+README.md
+LICENSE
+
+# Dockerfile
+Dockerfile

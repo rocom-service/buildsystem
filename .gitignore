@@ -1,0 +1,11 @@
+.vscode
+$RECYCLE.BIN/
+System Volume Information/
+
+# but keep empty folders
+!azp/.gitkeep
+!azp/agent/.gitkeep
+
+# secrets
+azure_token.txt
+azure_url.txt

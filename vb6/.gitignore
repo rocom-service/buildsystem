@@ -1,0 +1,16 @@
+.vscode
+$RECYCLE.BIN/
+System Volume Information/
+
+# vb6 product key
+Key.txt
+
+# vb6 install media
+1VS60Ent/*
+!1VS60Ent/vb6only.stf
+!1VS60Ent/.gitkeep
+3SP6_VSEnt/*
+!3SP6_VSEnt/.gitkeep
+
+# log files
+*.log
