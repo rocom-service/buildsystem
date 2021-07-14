@@ -37,7 +37,7 @@ param (
                ParameterSetName="StageParameterSetName",
                ValueFromPipeline=$true,
                ValueFromPipelineByPropertyName=$true)]
-    [ValidateSet("CreateVM", "StartVM", "SetupInitial", "SetupDrive", "SetupAccess", "SetupAgent", "SetupAutostart", "RestartVM")]
+    [ValidateSet("CreateVM", "SetupInitial", "SetupDrive", "SetupAccess", "SetupAgent", "SetupAutostart", "RestartVM")]
     [string]
     $Stage
 )
@@ -77,11 +77,9 @@ if ($Stage -eq "CreateVM" -or $Stage -eq "") {
     Add-VMHardDiskDrive -VMName $VMName -Path "$PSScriptRoot/Virtual Hard Disks/temp.vhdx"
     Set-VMProcessor -VMName $VMName -HwThreadCountPerCore 0 -Count 2
     Write-Host '[done]' -ForegroundColor Green
-}
 
-if ($Stage -eq "StartVM" -or $Stage -eq "") {
     Write-Host 'Starting VM ' -ForegroundColor Cyan -NoNewLine
-    Start-vm -Name $VMName
+    Start-VM -Name $VMName
     while ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
     Write-Host ' [done]' -ForegroundColor Green
 }
