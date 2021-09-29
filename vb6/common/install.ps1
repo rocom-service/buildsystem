@@ -24,8 +24,10 @@ Expand-Archive -Path "agent.zip" -DestinationPath "/azp/agent"
 
 # thanks to https://github.com/StefanScherer/dockerfiles-windows/tree/main/chocolatey \
 Write-Host 'Install chocolatey and some additional development tools...' -ForegroundColor Cyan
+mkdir C:\Users\ContainerAdministrator\Documents\WindowsPowerShell
+Set-Content C:\Users\ContainerAdministrator\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1 ""
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+try { Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')) } catch {}
 choco feature disable --name showDownloadProgress
 choco install -y nuget.commandline --version=4.9.4
 choco install -y git

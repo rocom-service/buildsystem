@@ -16,16 +16,30 @@ param(
                ValueFromPipelineByPropertyName=$true,
                HelpMessage="Starts container with docker run.")]
     [Switch]
-    $Run
+    $Run,
+
+    [Parameter(Mandatory=$true,
+               Position=0,
+               ParameterSetName="RunParameterSetName",
+               ValueFromPipeline=$true,
+               ValueFromPipelineByPropertyName=$true,
+               HelpMessage="Starts container with docker run.")]
+    [Switch]
+    $RunInitial
 )
 
 function Build {
     docker build `
         --build-arg VERSION=$((cmd /c ver | Out-String) -replace '[^\d\.]','') `
         --rm `
-        --isolation process `
         -t "vb6" `
         .
+}
+function RunInitial {
+    docker run `
+        -it `
+        -t vb6_container `
+        vb6
 }
 function Run {
     docker run `
@@ -38,6 +52,8 @@ function Run {
 
 if ($Build) {
     Build
-} elseif($Run) {
+} elseif ($Run) {
     Run
+} elseif ($RunInitial) {
+    RunInitial
 }
