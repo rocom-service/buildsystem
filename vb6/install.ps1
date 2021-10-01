@@ -71,7 +71,7 @@ if (!(Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\6.0\Setup\Vis
 # install Visual Basic 6
 Set-Location "$PSScriptRoot\1VS60Ent\"
 $cmd = '"' + $PSScriptRoot + '\1VS60Ent\ACMSetup.Exe"'
-$arguments = '/k ' + $vs_key + ' /n "' + $vs_name + '" /o "' + $vs_organisation + '" /T vb6only.STF  /B 1 /GC "' + $PSScriptRoot + '\install_vb6.log" /QTN'
+$arguments = '/k ' + $vs_key + ' /n "' + $vs_name + '" /o "' + $vs_organisation + '" /T vb6only.STF  /B 1 /GC "' + $env:temp + '\install_vb6.log" /QTN'
 Write-Host -ForegroundColor Yellow $cmd $arguments
 Start-Process $cmd -ArgumentList $arguments -Verb RunAs -Wait
 
@@ -83,30 +83,10 @@ Copy-Item "$PSScriptRoot\1VS60Ent\vb6only.STF" "$PSScriptRoot\3SP6_VSEnt\vb6only
 
 Set-Location "$PSScriptRoot\3SP6_VSEnt"
 $cmd = '"' + $PSScriptRoot + '\3SP6_VSEnt\setupsp6.Exe"'
-$arguments = '/k ' + $vs_key + ' /n "' + $vs_name + '" /o "' + $vs_organisation + '" /B 1 /GC "' + $PSScriptRoot + '\install_sp6.log" /QTN'
+$arguments = '/k ' + $vs_key + ' /n "' + $vs_name + '" /o "' + $vs_organisation + '" /B 1 /GC "' + $env:temp + '\install_sp6.log" /QTN'
 Write-Host -ForegroundColor Yellow $cmd $arguments
 Start-Process $cmd -ArgumentList $arguments -Verb RunAs -Wait
 
-
-
-if ($env:isdocker -eq "YES") {
-    Set-Location \
-
-    # set date format to german
-    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sCountry -Value "Germany" | Out-Null
-    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sLongDate -Value "dddd, d. MMMM yyyy" | Out-Null
-    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sShortDate -Value "dd.MM.yyyy" | Out-Null
-    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sShortTime -Value "HH:mm" | Out-Null
-    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sTimeFormat -Value "HH:mm:ss" | Out-Null
-    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sYearMonth -Value "MMMM yyyy" | Out-Null
-    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name iFirstDayOfWeek -Value 0 | Out-Null
-
-    # add vb6 to path
-    $newPath = (Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment' -Name PATH).path + ";C:\Program Files (x86)\Microsoft Visual Studio\VB98\"
-    Set-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment' -Name PATH -Value $newPath
-
-    # cleanup
-    Remove-Item -Recurse -Force "$PSScriptRoot\1VS60Ent"
-    Remove-Item -Recurse -Force "$PSScriptRoot\3SP6_VSEnt"
-    Remove-Item "$PSScriptRoot\install.ps1"
-}
+# add vb6 to path
+$newPath = (Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment' -Name PATH).path + ";C:\Program Files (x86)\Microsoft Visual Studio\VB98\"
+Set-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment' -Name PATH -Value $newPath

@@ -8,7 +8,7 @@ param (
                ValueFromPipelineByPropertyName=$true)]
     [ValidateNotNullOrEmpty()]
     [string]
-    $VMName = "Access 2010 Agent",
+    $VMName = "Visual Basic 6 Agent",
 
     [Parameter(Mandatory=$false,
                ValueFromPipeline=$true,
@@ -37,7 +37,7 @@ param (
                ParameterSetName="StageParameterSetName",
                ValueFromPipeline=$true,
                ValueFromPipelineByPropertyName=$true)]
-    [ValidateSet("CreateVM", "SetupInitial", "SetupDrive", "SetupAccess", "SetupAgent", "SetupAutostart", "RestartVM")]
+    [ValidateSet("CreateVM", "SetupInitial", "SetupDrive", "SetupVB6", "SetupTools", "SetupAgent", "SetupAutostart", "RestartVM")]
     [string]
     $Stage
 )
@@ -225,30 +225,66 @@ if ($Stage -eq "SetupDrive" -or $Stage -eq "") {
     Write-Host '[done]' -ForegroundColor Green
 }
 
-if ($Stage -eq "SetupAccess" -or $Stage -eq "") {
-    Write-Host 'Copying Microsoft Access installation media ' -ForegroundColor Cyan -NoNewline
+if ($Stage -eq "SetupVB6" -or $Stage -eq "") {
+    Write-Host 'Copying Microsoft Visual Basic installation media ' -ForegroundColor Cyan -NoNewline
     Write-Host ''
-    scp -r "$PSScriptRoot/registry" "${User}@${VMIpAddress}:/H:"
-    scp -r "$PSScriptRoot/setup"    "${User}@${VMIpAddress}:/H:"
-    Write-Host '[done]' -ForegroundColor Green
+
+    # copy folders as zip, because with 'scp -r' only two subfolders of ./1VS60Ent/ are copied !?
+    $files = 
+    $zip = "$PSScriptRoot\temp.zip"
+    if (-not (Test-Path $zip)) {
+        Compress-Archive -DestinationPath $zip -Path "$PSScriptRoot/1VS60Ent"`
+                                                   , "$PSScriptRoot/3SP6_VSEnt"`
+                                                   , "$PSScriptRoot/registry"`
+                                                   , "$PSScriptRoot/install.ps1"`
+                                                   , "$PSScriptRoot/Key.txt"
+    }
+
+    scp $zip "${User}@${VMIpAddress}:/H:/temp.zip"
 
     Invoke-Command -Session $session -ScriptBlock {
-        Write-Host "Installing Microsoft Access " -ForegroundColor Cyan -NoNewline
-        if (Test-Path 'C:/Program Files (x86)/Microsoft Office/Office14/MSACCESS.EXE') {
+        Remove-Item -Force -Recurse -ErrorAction SilentlyContinue "H:/1VS60Ent"
+        Remove-Item -Force -Recurse -ErrorAction SilentlyContinue "H:/3SP6_VSEnt"
+        Remove-Item -Force -Recurse -ErrorAction SilentlyContinue "H:/registry"
+        Expand-Archive -Force -Path "H:/temp.zip" -DestinationPath "H:/"
+        Remove-Item -Force -ErrorAction SilentlyContinue "H:/temp.zip"
+    }
+    Remove-Item -Force -ErrorAction SilentlyContinue $zip
+    Write-Host '[done]' -ForegroundColor Green
+    
+    Invoke-Command -Session $session -ScriptBlock {
+        Write-Host "Installing Microsoft Visual Basic 6 " -ForegroundColor Cyan -NoNewline
+        if (Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\VB98\VB6.EXE') {
             Write-Host '[skiped]' -ForegroundColor Red
         } else {
-            & "H:/setup/setup.exe"
-
-            $estimated = 530
-            while (-not (Get-Process setup).WaitForExit(3000)) {
-                $estimated -= 3
-                Write-Progress -Activity "Installing Microsoft Access" -SecondsRemaining $estimated
-                Write-Host '.' -ForegroundColor Cyan -NoNewline
-            }
-            Write-Host 'done' -ForegroundColor Green
-            Write-Progress -Activity "Installing Microsoft Access" -Completed
+            & "H:/install.ps1"
+             -ForegroundColor Green
         }
     }
+
+    Invoke-Command -Session $session -ScriptBlock {
+        Write-Host "Setting System to german " -ForegroundColor Cyan -NoNewline
+
+        reg import "H:\registry\oemcp.reg" *>&1 | Out-Null
+
+        # set date format to german
+        Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sCountry -Value "Germany" | Out-Null
+        Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sLongDate -Value "dddd, d. MMMM yyyy" | Out-Null
+        Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sShortDate -Value "dd.MM.yyyy" | Out-Null
+        Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sShortTime -Value "HH:mm" | Out-Null
+        Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sTimeFormat -Value "HH:mm:ss" | Out-Null
+        Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name sYearMonth -Value "MMMM yyyy" | Out-Null
+        Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name iFirstDayOfWeek -Value 0 | Out-Null
+
+        Write-Host '[done]' -ForegroundColor Green
+    }
+
+    try {
+        Invoke-Command -Session $session -ScriptBlock { 
+            Restart-Computer -Force 
+        }
+    } catch { }
+
 
     if ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') {
         Write-Host "Waiting for Reboot " -ForegroundColor Cyan -NoNewline
@@ -257,24 +293,7 @@ if ($Stage -eq "SetupAccess" -or $Stage -eq "") {
     }
     
     Invoke-Command -Session $session -ScriptBlock {
-        Remove-Item -Force -Recurse -ErrorAction SilentlyContinue H:/setup
-
-        Get-Content H:/registry/TrustedLocations.reg | ForEach-Object {
-            if ($_.StartsWith("`"Path`"")) {
-                "`"Path`"=`"H:\\azp\\agent\\_work\\`""
-            } else {
-                $_
-            }
-        } | Set-Content H:/registry/TrustedLocations.reg.tmp
-
-        reg import "H:\registry\TrustedLocations.reg.tmp" *>&1 | Out-Null
-        reg import "H:\registry\UserInfo.reg" *>&1 | Out-Null
-        reg import "H:\registry\General.reg" *>&1 | Out-Null
-
-        $app = New-Object -ComObject Access.Application
-        Write-Host "Access version installed: $((Get-Process msaccess -FileVersionInfo).FileVersion)"
-        $app.Quit()
-        Stop-Process -ProcessName msaccess -Force -ErrorAction SilentlyContinue
+        Write-Host "Visual Basic version installed: $((Get-Command vb6).Version.ToString())"
     }
 }
 
@@ -304,8 +323,13 @@ if ($Stage -eq "SetupAgent" -or $Stage -eq "") {
         }
         Expand-Archive -Path "H:/$filename" -DestinationPath "H:/azp/agent"
         Write-Host '[done]' -ForegroundColor Green
+    }
+}
 
-        Write-Host 'Install chocolatey and additional development tools ' -ForegroundColor Cyan -NoNewline
+Write-Host $Stage -ForegroundColor Green
+if ($Stage -eq "SetupTools" -or $Stage -eq "") {
+    Write-Host 'Install chocolatey and additional development tools ' -ForegroundColor Cyan -NoNewline
+    Invoke-Command -Session $session -ScriptBlock {
         [System.Environment]::SetEnvironmentVariable('chocolateyUseWindowsCompression', 'false', [System.EnvironmentVariableTarget]::Machine)
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         if ($null -eq (Get-Command choco -ErrorAction SilentlyContinue)) {
@@ -317,20 +341,24 @@ if ($Stage -eq "SetupAgent" -or $Stage -eq "") {
         }
         choco install -y nuget.commandline --version=4.9.4
         choco install -y git
+        choco install -y windows-sdk-10.1
+        choco install -y pwsh
         Write-Host '[done]' -ForegroundColor Green
+    }
 
+    Invoke-Command -Session $session -ScriptBlock {
         Write-Host 'Define additional environment variabales for usage in azure pipelines ' -ForegroundColor Cyan -NoNewline
         @{
             AZP_AGENT_NAME   = "$VMName"
             VSO_AGENT_IGNORE = "AZP_AGENT_NAME,AZP_TOKEN_FILE,ChocolateyLastPathUpdate,chocolateyUseWindowsCompression,PROMPT"
-            MsAccess         = "$((Get-ChildItem 'C:/Program Files (x86)/Microsoft Office/Office14/MSACCESS.EXE').Version.ToString())"
+            VisualBasic      = "$((Get-Command vb6).Version.ToString())"
             Git              = "$((Get-Command git).Version.ToString())"
             Nuget            = "$((Get-Command nuget).Version.ToString())"
         } |
             ConvertTo-Json |
             Set-Content -Force -Path "H:/azp/environment.json"
-        Write-Host '[done]' -ForegroundColor Green
     }
+    Write-Host '[done]' -ForegroundColor Green
 }
 
 if ($Stage -eq "SetupAutostart" -or $Stage -eq "") {
