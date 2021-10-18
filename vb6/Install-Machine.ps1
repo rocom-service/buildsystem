@@ -204,7 +204,7 @@ if ($Stage -eq "SetupInitial" -or $Stage -eq "") {
     if (Test-Path ${ENV:USERPROFILE}/.ssh/known_hosts) {
         Get-Content ${ENV:USERPROFILE}/.ssh/known_hosts | Where-Object { -not $_.StartsWith("|") } | Out-String | Set-Content $env:USERPROFILE/.ssh/known_hosts
     }
-    ssh-keyscan -H $VMIpAddress | Add-Content -Path $env:USERPROFILE/.ssh/known_hosts
+    ssh-keyscan -T 10 -t rsa -4 $VMIpAddress | Set-Content -Path $env:USERPROFILE/.ssh/known_hosts
     Write-Host '[done]' -ForegroundColor Green
 }
 
@@ -230,7 +230,6 @@ if ($Stage -eq "SetupVB6" -or $Stage -eq "") {
     Write-Host ''
 
     # copy folders as zip, because with 'scp -r' only two subfolders of ./1VS60Ent/ are copied !?
-    $files = 
     $zip = "$PSScriptRoot\temp.zip"
     if (-not (Test-Path $zip)) {
         Compress-Archive -DestinationPath $zip -Path "$PSScriptRoot/1VS60Ent"`
@@ -326,7 +325,6 @@ if ($Stage -eq "SetupAgent" -or $Stage -eq "") {
     }
 }
 
-Write-Host $Stage -ForegroundColor Green
 if ($Stage -eq "SetupTools" -or $Stage -eq "") {
     Write-Host 'Install chocolatey and additional development tools ' -ForegroundColor Cyan -NoNewline
     Invoke-Command -Session $session -ScriptBlock {
@@ -363,25 +361,44 @@ if ($Stage -eq "SetupTools" -or $Stage -eq "") {
 
 if ($Stage -eq "SetupAutostart" -or $Stage -eq "") {
     Write-Host "Installing startup script " -ForegroundColor Cyan -NoNewline
-    Invoke-Command -Session $session -ScriptBlock {
-        @(
-            "C:\Users\${ENV:USERNAME}\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
-            "C:\Users\${ENV:USERNAME}\Desktop"
-        ) | ForEach-Object {
-            $file = "$_\Start-Agent.lnk"
-            
-            $WshShell = New-Object -comObject WScript.Shell
-            $Shortcut = $WshShell.CreateShortcut($file)
-            $Shortcut.TargetPath = (Get-Command powershell.exe).Path
-            $Shortcut.Arguments = "-noprofile -noexit -file H:/Start-Agent.ps1"
-            $Shortcut.WindowStyle = 3
-            $Shortcut.WorkingDirectory = "H:\"
-            $Shortcut.Save()
-            
-            $bytes = [System.IO.File]::ReadAllBytes($file)
-            $bytes[0x15] = $bytes[0x15] -bor 0x20 #set byte 21 (0x15) bit 6 (0x20) ON (Use –bor to set RunAsAdministrator option and –bxor to unset)
-            [System.IO.File]::WriteAllBytes($file, $bytes)
+    Invoke-Command -Session $session -ArgumentList $User -ScriptBlock {
+        param($User)
+
+        $name = "Start-Agent.ps1"
+        Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue | Unregister-ScheduledTask
+
+        $p = @{
+            TaskName    = $name
+            Description = "starts azure pipeline agent"
+            Action      = (
+                            New-ScheduledTaskAction `
+                                -Execute 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' `
+                                -Argument '-NoProfile -NoExit -File H:/Start-Agent.ps1' `
+                          )
+            Trigger     = (
+                            New-ScheduledTaskTrigger `
+                                -AtStartup `
+                          )
+            Settings    = (
+                            New-ScheduledTaskSettingsSet `
+                                -MultipleInstances Queue `
+                                -DontStopOnIdleEnd `
+                                -DontStopIfGoingOnBatteries `
+                                -Compatibility Win8 `
+                          )
+            Principal   = (
+                            New-ScheduledTaskPrincipal `
+                                -UserID "$User" `
+                                -LogonType ServiceAccount `
+                                -RunLevel Highest `
+                          )
         }
+        $p.Settings.ExecutionTimeLimit = 'PT0S'
+        $p.Settings.IdleSettings.StopOnIdleEnd = $false
+        $p.Settings.Compatibility = [Microsoft.PowerShell.Cmdletization.GeneratedTypes.ScheduledTask.CompatibilityEnum]::Win8
+
+        $p | ConvertTo-Json -Depth 1 | Write-Host -ForegroundColor Yellow
+        Register-ScheduledTask @p
     }
     Write-Host '[done]' -ForegroundColor Green
 }
