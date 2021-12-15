@@ -29,12 +29,13 @@ Get-Content "$PSScriptRoot\azp\environment.json" |
   } |
   ForEach-Object { [System.Environment]::SetEnvironmentVariable($_.Name, $_.Value) }
 
-if ($Env:AZP_WORK -and -not (Test-Path Env:AZP_WORK)) {
-  New-Item $Env:AZP_WORK -ItemType directory | Out-Null
-}
-
 $old = Get-Location
 Set-Location "$PSScriptRoot\azp\agent"
+
+$work = if (Test-Path Env:AZP_WORK) { ${Env:AZP_WORK} } else { '_work' }
+Get-ChildItem .\_work\ -Directory -ErrorAction SilentlyContinue | 
+    Where-Object { $_.Name -match "\d+" } | 
+    Remove-Item -Recurse -Force
 
 try
 {
@@ -45,7 +46,7 @@ try
     --auth PAT `
     --token "$(Get-Content "$PSScriptRoot\azp\azure_token.txt")" `
     --pool "$(if (Test-Path Env:AZP_POOL) { ${Env:AZP_POOL} } else { 'Default' })" `
-    --work "$(if (Test-Path Env:AZP_WORK) { ${Env:AZP_WORK} } else { '_work' })" `
+    --work "$work" `
     --replace
 
   Write-Host "Running Azure Pipelines agent..." -ForegroundColor Cyan
