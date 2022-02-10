@@ -41,8 +41,8 @@ $session = New-PSSession -Credential $credentials -VMName $VMName
 $VMIpAddress = (Get-VM -Name $VMName).Networkadapters.IPAddresses | Select-Object -First 1
 
 Write-Host "Installing startup script " -ForegroundColor Cyan -NoNewline
-Invoke-Command -Session $session -ArgumentList $User -ScriptBlock {
-    param($User)
+Invoke-Command -Session $session -ArgumentList $User,$Password -ScriptBlock {
+    param($User,$Password)
 
     $name = "Start-Agent.ps1"
     Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue | Unregister-ScheduledTask
@@ -66,12 +66,8 @@ Invoke-Command -Session $session -ArgumentList $User -ScriptBlock {
                             -DontStopIfGoingOnBatteries `
                             -Compatibility Win8 `
                         )
-        Principal   = (
-                         New-ScheduledTaskPrincipal `
-                            -UserID "NT AUTHORITY\SYSTEM" `
-                            -LogonType ServiceAccount `
-                            -RunLevel Highest
-                        )
+        User        = $User
+        Password    = $Password
     }
     $p.Settings.ExecutionTimeLimit = 'PT0S'
     $p.Settings.IdleSettings.StopOnIdleEnd = $false
