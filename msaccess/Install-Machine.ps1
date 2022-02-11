@@ -52,6 +52,7 @@ if ($Stage -eq "1" -or $Stage -eq "") {
     Write-Host "== Stage 1 ==" -ForegroundColor Cyan
     & $PSScriptRoot/../common/New-VM.ps1 `
         -VMName $VMName `
+        -VMDisk $VMDisk `
         -ScriptRoot $PSScriptRoot
 }
 
@@ -70,9 +71,9 @@ if ($Stage -eq "2" -or $Stage -eq "") {
 
 if ($Stage -eq "3" -or $Stage -eq "") {
     Write-Host "== Stage 3 ==" -ForegroundColor Cyan
-    Write-Host 'Copying Microsoft Access installation media ' -ForegroundColor Cyan -NoNewline
 
-    # copy folders as zi
+    Write-Host 'Copying Microsoft Access installation media ' -ForegroundColor Cyan -NoNewline
+    # copy folders as zip
     $zip = "$PSScriptRoot\temp.zip"
     if (-not (Test-Path $zip)) {
         Compress-Archive -DestinationPath $zip -Path "$PSScriptRoot/registry"`
@@ -197,5 +198,3 @@ if ($Stage -eq "7" -or $Stage -eq "") {
     } catch { }
     Write-Host '[done]' -ForegroundColor Green
 }
-
-Write-Host 'All done.' -ForegroundColor Green

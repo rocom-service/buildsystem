@@ -52,6 +52,7 @@ if ($Stage -eq "1" -or $Stage -eq "") {
     Write-Host "== Stage 1 ==" -ForegroundColor Cyan
     & $PSScriptRoot/../common/New-VM.ps1 `
         -VMName $VMName `
+        -VMDisk $VMDisk `
         -ScriptRoot $PSScriptRoot
 }
 
@@ -228,5 +229,3 @@ if ($Stage -eq "7" -or $Stage -eq "") {
     } catch { }
     Write-Host '[done]' -ForegroundColor Green
 }
-
-Write-Host 'All done.' -ForegroundColor Green

@@ -11,10 +11,25 @@ param (
 
     [Parameter(Mandatory=$true,
                ValueFromPipeline=$true,
+               ValueFromPipelineByPropertyName=$true,
+               HelpMessage="Path to vhdx drive template.")]
+    [Alias("PSPath")]
+    [ValidateNotNullOrEmpty()]
+    [string]
+    $VMDisk,
+
+    [Parameter(Mandatory=$true,
+               ValueFromPipeline=$true,
                ValueFromPipelineByPropertyName=$true)]
     [ValidateNotNullOrEmpty()]
     [string]
-    $ScriptRoot
+    $ScriptRoot,
+
+    [Parameter(Mandatory=$true,
+               ValueFromPipeline=$true,
+               ValueFromPipelineByPropertyName=$true)]
+    [ulong]
+    $DiskSize = 10GB
 )
 
 Write-Host 'Stoping VM ' -ForegroundColor Cyan -NoNewline
@@ -31,7 +46,7 @@ Write-Host '[done]' -ForegroundColor Green
 
 Write-Host 'Createing VM ' -ForegroundColor Cyan -NoNewline
 Copy-Item -Path $VMDisk -Destination "$ScriptRoot/Virtual Hard Disks/disk.vhdx"
-New-VHD -Path "$ScriptRoot/Virtual Hard Disks/temp.vhdx" -SizeBytes 10GB -Dynamic | Out-Null
+New-VHD -Path "$ScriptRoot/Virtual Hard Disks/temp.vhdx" -SizeBytes $DiskSize -Dynamic | Out-Null
 New-VM -Name $VMName `
         -MemoryStartupBytes 3GB `
         -BootDevice VHD `

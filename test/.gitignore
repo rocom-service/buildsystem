@@ -1,0 +1,13 @@
+.vscode
+$RECYCLE.BIN/
+System Volume Information/
+
+# hyper-V hard disk
+Virtual Hard Disks/*
+!Virtual Hard Disks/.gitkeep
+
+# Tau-Office install media
+setup*.exe
+
+# Tau-Office data
+*.zip
