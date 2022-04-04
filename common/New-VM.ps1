@@ -25,8 +25,7 @@ param (
     [string]
     $ScriptRoot,
 
-    [Parameter(Mandatory=$true,
-               ValueFromPipeline=$true,
+    [Parameter(ValueFromPipeline=$true,
                ValueFromPipelineByPropertyName=$true)]
     [ulong]
     $DiskSize = 10GB
@@ -59,6 +58,7 @@ Set-VM -Name $VMName `
 Add-VMHardDiskDrive -VMName $VMName -Path "$ScriptRoot/Virtual Hard Disks/disk.vhdx"
 Add-VMHardDiskDrive -VMName $VMName -Path "$ScriptRoot/Virtual Hard Disks/temp.vhdx"
 Set-VMProcessor -VMName $VMName -HwThreadCountPerCore 0 -Count 2
+Get-VMIntegrationService -VMName $VMName | Where-Object Enabled -EQ $false | Enable-VMIntegrationService
 Write-Host '[done]' -ForegroundColor Green
 
 Write-Host 'Starting VM ' -ForegroundColor Cyan -NoNewLine

@@ -2,9 +2,6 @@
 $RECYCLE.BIN/
 System Volume Information/
 
-# Azure Devops install media
-vsts-agent-win-*.zip
-
 # hyper-V hard disk
 Virtual Hard Disks/*
 !Virtual Hard Disks/.gitkeep
@@ -12,7 +9,3 @@ Virtual Hard Disks/*
 # msoffice install media
 setup/*
 !setup/.gitkeep
-
-# secrets
-id_rsa
-id_rsa.pub

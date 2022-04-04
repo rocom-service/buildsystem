@@ -31,14 +31,8 @@ param (
     $ScriptRoot
 )
 
-$ssh = try { Get-Command ssh.exe -ErrorAction Stop } catch { $null }
-if ($ssh.Version -lt [version]::new(8,1,0,1)) {
-    throw "OpenSSH.Client << Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0 >> is needed"
-}
-
 $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
 $session = New-PSSession -Credential $credentials -VMName $VMName
-$VMIpAddress = (Get-VM -Name $VMName).Networkadapters.IPAddresses | Select-Object -First 1
 
 Write-Host "Installing startup script " -ForegroundColor Cyan -NoNewline
 Invoke-Command -Session $session -ArgumentList $User,$Password -ScriptBlock {

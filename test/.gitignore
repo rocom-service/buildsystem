@@ -8,6 +8,7 @@ Virtual Hard Disks/*
 
 # Tau-Office install media
 setup*.exe
+rocom.*.nupkg
 
 # Tau-Office data
 *.zip

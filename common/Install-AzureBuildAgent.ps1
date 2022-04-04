@@ -30,23 +30,14 @@ param (
     [string]
     $ScriptRoot
 )
-
-
-$ssh = try { Get-Command ssh.exe -ErrorAction Stop } catch { $null }
-if ($ssh.Version -lt [version]::new(8,1,0,1)) {
-    throw "OpenSSH.Client << Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0 >> is needed"
-}
-
 $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
 $session = New-PSSession -Credential $credentials -VMName $VMName
-$VMIpAddress = (Get-VM -Name $VMName).Networkadapters.IPAddresses | Select-Object -First 1
 
 Write-Host 'Copying Azure Pipelines agent installation media ' -ForegroundColor Cyan -NoNewline
 Write-Host ''
-scp "$ScriptRoot/../azure_token.txt"   "${User}@${VMIpAddress}:/H:/azp/azure_token.txt"
-scp "$ScriptRoot/../azure_url.txt"     "${User}@${VMIpAddress}:/H:/azp/azure_url.txt"
-scp "$ScriptRoot/Start-Agent.ps1"      "${User}@${VMIpAddress}:/H:/Start-Agent.ps1"
-scp "$ScriptRoot/vsts-agent-win-*.zip" "${User}@${VMIpAddress}:/H:/"
+Copy-VMFile -VMName $VMName -CreateFullPath -FileSource Host -SourcePath "$ScriptRoot/../azure_token.txt"   -DestinationPath "H:/azp/azure_token.txt"
+Copy-VMFile -VMName $VMName -CreateFullPath -FileSource Host -SourcePath "$ScriptRoot/../azure_url.txt"     -DestinationPath "H:/azp/azure_url.txt"
+Copy-VMFile -VMName $VMName -CreateFullPath -FileSource Host -SourcePath "$ScriptRoot/Start-Agent.ps1"      -DestinationPath "H:/Start-Agent.ps1"
 Write-Host '[done]' -ForegroundColor Green
 
 Invoke-Command -Session $session -ScriptBlock {
