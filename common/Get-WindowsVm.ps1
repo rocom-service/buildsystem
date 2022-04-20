@@ -33,17 +33,20 @@ Write-Host '[done]' -ForegroundColor Green
 
 
 Write-Host 'Copying vhdx ' -ForegroundColor Cyan -NoNewline
-Remove-Item "$PSScriptRoot\..\msaccess\Virtual Hard Disks\template.vhdx" -Force -ErrorAction SilentlyContinue
-Remove-Item "$PSScriptRoot\..\vb6\Virtual Hard Disks\template.vhdx" -Force -ErrorAction SilentlyContinue
+Get-ChildItem -Recurse -Filter template.vhdx | Remove-Item -Force 
 
 Get-ChildItem $env:TEMP\vm -Recurse -Filter "*.vhdx" |
     Copy-Item -Destination "$PSScriptRoot\..\msaccess\Virtual Hard Disks\template.vhdx" -Force |
     Out-Null
 
 $old = Get-Location
-Set-Location "$PSScriptRoot\..\vb6\Virtual Hard Disks\"
-New-Item -ItemType HardLink -Name template.vhdx -Value "$PSScriptRoot\..\msaccess\Virtual Hard Disks\template.vhdx" |
-    Out-Null
+foreach ($location in @("$PSScriptRoot\..\vb6\Virtual Hard Disks\",
+                        "$PSScriptRoot\..\test\Virtual Hard Disks\"))
+{
+    Set-Location $location
+    New-Item -ItemType HardLink -Name template.vhdx -Value "$PSScriptRoot\..\msaccess\Virtual Hard Disks\template.vhdx" |
+        Out-Null
+}
 Set-Location $old
 Write-Host '[done]' -ForegroundColor Green
 

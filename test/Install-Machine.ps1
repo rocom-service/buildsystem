@@ -30,7 +30,7 @@ param (
                HelpMessage="Path to vhdx drive template.")]
     [Alias("PSPath")]
     [string]
-    $VMDisk = "$PSScriptRoot/../msaccess/Virtual Hard Disks/template.vhdx",
+    $VMDisk = "$PSScriptRoot/Virtual Hard Disks/template.vhdx",
 
     [Parameter(Mandatory=$false,
                ValueFromPipeline=$true,
