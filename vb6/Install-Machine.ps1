@@ -70,8 +70,17 @@ Process {
                 -ScriptRoot $PSScriptRoot
         }
 
-        $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
-        $session = New-PSSession -Credential $credentials -VMName $VMName
+        $session = $null
+        while ($null -eq $session) {
+            $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
+            try {
+                $session = New-PSSession -Credential $credentials -VMName $VMName
+            } catch {
+                $session = $null
+                Write-Host "Failed to connect to VM. Retrying in 5 seconds..." -ForegroundColor Red
+                Start-Sleep -Seconds 5
+            }
+        }
 
         if ($Stage -eq "2") {
             Write-Host "== Stage 2 ==" -ForegroundColor Cyan
