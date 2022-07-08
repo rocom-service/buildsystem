@@ -63,7 +63,6 @@ Process {
         if (-not $OmitStagePrinting) { Write-Host "== Stage $Stage ==" -ForegroundColor Cyan }
 
         if ($Stage -eq "1") {
-            Write-Host "== Stage 1 ==" -ForegroundColor Cyan
             & $PSScriptRoot/../common/New-VM.ps1 `
                 -VMName $VMName `
                 -VMDisk $VMDisk `
@@ -83,7 +82,6 @@ Process {
         }
 
         if ($Stage -eq "2") {
-            Write-Host "== Stage 2 ==" -ForegroundColor Cyan
             & $PSScriptRoot/../common/Install-Windows.ps1 `
                 -VMName $VMName `
                 -ScriptRoot $PSScriptRoot `
@@ -92,7 +90,6 @@ Process {
         }
 
         if ($Stage -eq "3") {
-            Write-Host "== Stage 3 ==" -ForegroundColor Cyan
             Write-Host 'Copying Microsoft Visual Basic installation media ' -ForegroundColor Cyan -NoNewline
             Write-Host ''
 
@@ -125,6 +122,20 @@ Process {
 
             Invoke-Command -Session $session -ScriptBlock {
                 Write-Host "Installing Microsoft Visual Basic 6 " -ForegroundColor Cyan -NoNewline
+
+                $file = "$env:UserProfile\Desktop\Run Installation.lnk"
+                $WshShell = New-Object -comObject WScript.Shell
+                $Shortcut = $WshShell.CreateShortcut($file)
+                $Shortcut.TargetPath = (Get-Command powershell.exe).Path
+                $Shortcut.Arguments = "-noprofile -noexit -file H:/install.ps1"
+                $Shortcut.WindowStyle = 3
+                $Shortcut.WorkingDirectory = "H:\"
+                $Shortcut.Save()
+                
+                $bytes = [System.IO.File]::ReadAllBytes($file)
+                $bytes[0x15] = $bytes[0x15] -bor 0x20 #set byte 21 (0x15) bit 6 (0x20) ON (Use –bor to set RunAsAdministrator option and –bxor to unset)
+                [System.IO.File]::WriteAllBytes($file, $bytes)
+                
                 if (Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\VB98\VB6.EXE') {
                     Write-Host '[skiped]' -ForegroundColor Red
                 } else {
@@ -134,6 +145,8 @@ Process {
                     }
                     Write-Host '[done]' -ForegroundColor Green
                 }
+
+                Remove-Item $file
             }
 
             try {
@@ -157,7 +170,6 @@ Process {
         }
 
         if ($Stage -eq "4") {
-            Write-Host "== Stage 4 ==" -ForegroundColor Cyan
             & $PSScriptRoot/../common/Install-AzureBuildAgent.ps1 `
                 -VMName $VMName `
                 -ScriptRoot $PSScriptRoot `
@@ -166,7 +178,6 @@ Process {
         }
 
         if ($Stage -eq "5") {
-            Write-Host "== Stage 5 ==" -ForegroundColor Cyan
             Write-Host 'Install chocolatey and additional development tools ' -ForegroundColor Cyan -NoNewline
             Invoke-Command -Session $session -ArgumentList $VMName -ScriptBlock {
                 param($VMName)
@@ -186,6 +197,8 @@ Process {
                 choco install -y pwsh
                 Write-Host '[done]' -ForegroundColor Green
             }
+            
+            $session = New-PSSession -Credential $credentials -VMName $VMName
 
             Invoke-Command -Session $session -ScriptBlock {
                 Write-Host 'Define additional environment variabales for usage in azure pipelines ' -ForegroundColor Cyan -NoNewline
@@ -203,7 +216,6 @@ Process {
         }
 
         if ($Stage -eq "6") {
-            Write-Host "== Stage 6 ==" -ForegroundColor Cyan
             & $PSScriptRoot/../common/Install-StartupScript.ps1 `
                 -VMName $VMName `
                 -ScriptRoot $PSScriptRoot `
@@ -212,7 +224,6 @@ Process {
         }
 
         if ($Stage -eq "7") {
-            Write-Host "== Stage 7 ==" -ForegroundColor Cyan
             Write-Host 'Restarting VM ' -ForegroundColor Cyan -NoNewline
             try {
                 Invoke-Command -Session $session -ScriptBlock { 
