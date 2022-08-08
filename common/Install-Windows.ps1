@@ -90,6 +90,10 @@ Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName -ScriptBl
     Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableLUA" -Value "1"
     Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -Name "PromptOnSecureDesktop" -Value "0"
 
+    # enable rdp
+    Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
+    Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
     # restart time sync
     net stop w32time  *>&1 | Out-Null
     w32tm /unregister *>&1 | Out-Null

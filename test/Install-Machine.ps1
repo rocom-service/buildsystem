@@ -47,21 +47,6 @@ param (
     $SetupPath = "$PSScriptRoot/setup*.exe",
 
     [Parameter(Mandatory=$false,
-               ParameterSetName="InstallDatabasesParameterSetName",
-               ValueFromPipeline=$false,
-               ValueFromPipelineByPropertyName=$true)]
-    [switch]
-    $InstallDatabases,
-
-    [Parameter(Mandatory=$false,
-               ParameterSetName="InstallTauOfficeParameterSetName",
-               ValueFromPipeline=$false,
-               ValueFromPipelineByPropertyName=$true)]
-    [switch]
-    $InstallTauOffice,
-
-    [Parameter(Mandatory=$false,
-               ParameterSetName="StageParameterSetName",
                ValueFromPipeline=$false,
                ValueFromPipelineByPropertyName=$true)]
     [ValidateSet("1", "2", "3", "4", "5", "6", "7", "8")]
@@ -87,9 +72,6 @@ Begin {
     if (-not ($VMDisk | Test-Path -PathType Leaf)) { throw "Parameter VMDisk: File '$VMDisk' not found." }
     if ((Get-ChildItem $DataPath | Measure-Object).Count -le 0)  { throw "Parameter DataPath: File or directory '$DataPath' not found." }
     if ((Get-ChildItem $SetupPath | Measure-Object).Count -le 0) { throw "Parameter SetupPath: File '$SetupPath' not found." }
-
-    if ($InstallTauOffice) { $Stage = @(6) }
-    if ($InstallDatabases) { $Stage = @(7) }
 
     if ($null -eq $Stage) { 
         $ParameterList = (Get-Command -Name "$PSScriptRoot/$($MyInvocation.MyCommand)").Parameters
@@ -335,9 +317,19 @@ Process {
             Write-Host 'Restarting VM ' -ForegroundColor Cyan -NoNewline
             try {
                 Invoke-Command -Session $session -ScriptBlock { 
+                    Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -InformationAction Quiet
                     Restart-Computer -Force 
                 }
             } catch { }
+            while ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
+            Write-Host '[done]' -ForegroundColor Green
+            
+            Write-Host 'Connecting RDP ' -ForegroundColor Cyan -NoNewline
+            while ($null -eq ((Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1)) { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
+            $IpAddress = (Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1 
+            while (-not (Test-NetConnection $IpAddress -Port 3389 -InformationLevel Quiet)) { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
+            Start-Sleep 10
+            mstsc /v:$IpAddress
             Write-Host '[done]' -ForegroundColor Green
         }
 

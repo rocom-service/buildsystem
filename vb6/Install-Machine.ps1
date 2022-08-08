@@ -112,14 +112,6 @@ Process {
             Remove-Item -Force -ErrorAction SilentlyContinue $zip
             Write-Host '[done]' -ForegroundColor Green
             
-            Write-Host "************************************************" -ForegroundColor Magenta
-            Write-Host " We need a logged in user to install vb6!       " -ForegroundColor Magenta
-            Write-Host " Please log into the vm and run H:\install.ps1 ." -ForegroundColor Magenta
-            Write-Host "                                                " -ForegroundColor Magenta
-            Write-Host " User:     $User                                " -ForegroundColor Magenta
-            Write-Host " Password: $Password                            " -ForegroundColor Magenta
-            Write-Host "************************************************" -ForegroundColor Magenta
-
             Invoke-Command -Session $session -ScriptBlock {
                 Write-Host "Installing Microsoft Visual Basic 6 " -ForegroundColor Cyan -NoNewline
 
@@ -135,7 +127,20 @@ Process {
                 $bytes = [System.IO.File]::ReadAllBytes($file)
                 $bytes[0x15] = $bytes[0x15] -bor 0x20 #set byte 21 (0x15) bit 6 (0x20) ON (Use –bor to set RunAsAdministrator option and –bxor to unset)
                 [System.IO.File]::WriteAllBytes($file, $bytes)
-                
+            }
+
+            Write-Host "************************************************" -ForegroundColor Magenta
+            Write-Host " We need a logged in user to install vb6!       " -ForegroundColor Magenta
+            Write-Host " Please log into the vm and run H:\install.ps1 ." -ForegroundColor Magenta
+            Write-Host "                                                " -ForegroundColor Magenta
+            Write-Host " User:     $User                                " -ForegroundColor Magenta
+            Write-Host " Password: $Password                            " -ForegroundColor Magenta
+            Write-Host "************************************************" -ForegroundColor Magenta
+            Read-Host "Press Enter to connect ..."
+
+            mstsc /v:(Get-VM $VMName).NetworkAdapters.IPAddresses[0]
+            
+            Invoke-Command -Session $session -ScriptBlock {
                 if (Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\VB98\VB6.EXE') {
                     Write-Host '[skiped]' -ForegroundColor Red
                 } else {
