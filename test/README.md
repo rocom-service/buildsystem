@@ -4,7 +4,7 @@ This project helps building a test system for Tau-Office.
 # What do you need
 1. A Tau-Office setup in this directory, e.g. setup_20211215_029.exe
 2. A zip file in this directory with
-    - at least to database backups (.bak files)
+    - at least two database backups (.bak files)
     - content of the "Mandantenpfad" (CFG, Vorlagen, Mand000000-Mand99999)
 3. A Virtual Hard Disk with installed Windows 10 in ./Virtual Hard Disks/template.vhdx
 4. Hyper-V
