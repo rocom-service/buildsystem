@@ -1,5 +1,5 @@
 # Visual Basic 6 setup script
-This project helps you to install Visual Basic on a modern Windows 10 machine. You may even use the Dockerfile in order build your vb6 application with Azure Piplines.
+This project helps you to install Visual Basic on a modern Windows 10 machine. You may even use this repo to build your vb6 application with Azure Piplines.
 
 # What do you need
 1. A productkey for Visual Studio 6.0 Enterprise
