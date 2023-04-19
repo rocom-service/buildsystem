@@ -50,7 +50,7 @@ param (
 )
 Begin {
     $ErrorActionPreference = 'Stop'
-    if ($null -eq $Stage) { 
+    if ($null -eq $Stage) {
         $ParameterList = (Get-Command -Name "$PSScriptRoot/$($MyInvocation.MyCommand)").Parameters
         $Stages = $ParameterList["Stage"].Attributes.ValidValues
     } else {
@@ -86,7 +86,8 @@ Process {
                 -VMName $VMName `
                 -ScriptRoot $PSScriptRoot `
                 -User $User `
-                -Password $Password
+                -Password $Password `
+                -IPAddress 192.168.2.95
         }
 
         if ($Stage -eq "3") {
@@ -138,7 +139,7 @@ Process {
             Write-Host "************************************************" -ForegroundColor Magenta
             Read-Host "Press Enter to connect ..."
 
-            mstsc /v:(Get-VM $VMName).NetworkAdapters.IPAddresses[0]
+            mstsc /v:'192.168.2.95'
             
             Invoke-Command -Session $session -ScriptBlock {
                 if (Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\VB98\VB6.EXE') {
@@ -155,8 +156,8 @@ Process {
             }
 
             try {
-                Invoke-Command -Session $session -ScriptBlock { 
-                    Restart-Computer -Force 
+                Invoke-Command -Session $session -ScriptBlock {
+                    Restart-Computer -Force
                 }
             } catch { }
 
@@ -231,8 +232,8 @@ Process {
         if ($Stage -eq "7") {
             Write-Host 'Restarting VM ' -ForegroundColor Cyan -NoNewline
             try {
-                Invoke-Command -Session $session -ScriptBlock { 
-                    Restart-Computer -Force 
+                Invoke-Command -Session $session -ScriptBlock {
+                    Restart-Computer -Force
                 }
             } catch { }
             Write-Host '[done]' -ForegroundColor Green

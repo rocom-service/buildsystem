@@ -112,12 +112,12 @@ Process {
         }
 
         if ($Stage -eq "2") {
-            & $PSScriptRoot/../msaccess/Install-Machine.ps1 `
+            & $PSScriptRoot/../common/Install-Windows.ps1 `
                 -VMName $VMName `
+                -ScriptRoot $PSScriptRoot `
                 -User $User `
                 -Password $Password `
-                -Stage 2 `
-                -OmitStagePrinting
+                -IPAddress 192.168.2.80
         }
 
         if ($Stage -eq "3") {

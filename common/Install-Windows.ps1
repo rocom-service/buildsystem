@@ -28,14 +28,21 @@ param (
                ValueFromPipelineByPropertyName=$true)]
     [ValidateNotNullOrEmpty()]
     [string]
-    $ScriptRoot
+    $ScriptRoot,
+
+    [Parameter(Mandatory=$true,
+               ValueFromPipeline=$true,
+               ValueFromPipelineByPropertyName=$true)]
+    [ValidateNotNullOrEmpty()]
+    [string]
+    $IPAddress
 )
 $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
 $session = New-PSSession -Credential $credentials -VMName $VMName
 
- Write-Host 'Initial Windows setup ' -ForegroundColor Cyan -NoNewline
-Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName -ScriptBlock {
-    param($User,$Password,$VMName)
+Write-Host 'Initial Windows setup ' -ForegroundColor Cyan -NoNewline
+Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$IPAddress -ScriptBlock {
+    param($User,$Password,$VMName,$IPAddress)
 
     $WindowsUpdatePath = "HKLM:SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\"
     $AutoUpdatePath = "HKLM:SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
@@ -78,9 +85,18 @@ Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName -ScriptBl
         "127.0.0.1      wustat.windows.com"
     ) | Add-Content -Path C:\Windows\System32\drivers\etc\hosts
 
+    # set fixed ip address
+    Get-NetIPAddress -PrefixLength 24 |
+        ForEach-Object {
+            Set-NetIPAddress `
+                -InterfaceIndex $_.InterfaceIndex `
+                -IPAddress $IPAddress `
+                -PrefixLength 24
+        }
+    
     # login without password
-    Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "AutoAdminLogon" -Value "1" -Type String 
-    Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultUsername" -Value $User -Type String 
+    Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "AutoAdminLogon" -Value "1" -Type String
+    Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultUsername" -Value $User -Type String
     Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultPassword" -Value $Password -Type String
     Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultDomainName" -Value $env:COMPUTERNAME -Type String
 

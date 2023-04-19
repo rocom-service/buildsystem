@@ -50,7 +50,7 @@ param (
 )
 Begin {
     $ErrorActionPreference = 'Stop'
-    if ($null -eq $Stage) { 
+    if ($null -eq $Stage) {
         $ParameterList = (Get-Command -Name "$PSScriptRoot/$($MyInvocation.MyCommand)").Parameters
         $Stages = $ParameterList["Stage"].Attributes.ValidValues
     } else {
@@ -77,7 +77,8 @@ Process {
                 -VMName $VMName `
                 -ScriptRoot $PSScriptRoot `
                 -User $User `
-                -Password $Password
+                -Password $Password `
+                -IPAddress 192.168.2.82
         }
 
         if ($Stage -eq "3") {
@@ -196,8 +197,8 @@ Process {
         if ($Stage -eq "7") {
             Write-Host 'Restarting VM ' -ForegroundColor Cyan -NoNewline
             try {
-                Invoke-Command -Session $session -ScriptBlock { 
-                    Restart-Computer -Force 
+                Invoke-Command -Session $session -ScriptBlock {
+                    Restart-Computer -Force
                 }
             } catch { }
             Write-Host '[done]' -ForegroundColor Green
