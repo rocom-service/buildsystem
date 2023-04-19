@@ -1,28 +1,12 @@
 [CmdletBinding()]
 param (
 )
-
-
-Write-Host 'Getting vmsId ' -ForegroundColor Cyan -NoNewline
-$vmsId = ((Invoke-WebRequest https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/).Content | Select-String "edgePortal.vmsId = (\d+)").Matches.Groups[1].Value
-Write-Host '[done]' -ForegroundColor Green
-Write-Host "vmsId is $vmsId"
-
-
-Write-Host 'Getting download link ' -ForegroundColor Cyan -NoNewline
-$hypervVm = (Invoke-RestMethod  https://developer.microsoft.com/en-us/microsoft-edge/api/tools/vms/?id=$vmsId) |
-                Select-Object -Last 1 -ExpandProperty software |
-                Where-Object name -Like *HyperV* |
-                Select-Object -ExpandProperty files |
-                Where-Object name -Like *.zip
-Write-Host '[done]' -ForegroundColor Green
-Write-Host "Download link is:"
-$hypervVm | Format-Table
+$ErrorActionPreference = 'Stop'
 
 
 Write-Host 'Downloading VM ' -ForegroundColor Cyan -NoNewline
 Remove-Item $env:TEMP\vm.zip -Force -ErrorAction SilentlyContinue
-Invoke-WebRequest -Uri $hypervVm.url -OutFile $env:TEMP\vm.zip
+Invoke-WebRequest -Uri "https://aka.ms/windev_VM_hyperv" -OutFile $env:TEMP\vm.zip
 Write-Host '[done]' -ForegroundColor Green
 
 
@@ -33,10 +17,10 @@ Write-Host '[done]' -ForegroundColor Green
 
 
 Write-Host 'Copying vhdx ' -ForegroundColor Cyan -NoNewline
-Get-ChildItem -Recurse -Filter template.vhdx | Remove-Item -Force 
+Get-ChildItem -Recurse -Filter template.vhdx | Remove-Item -Force
 
 Get-ChildItem $env:TEMP\vm -Recurse -Filter "*.vhdx" |
-    Copy-Item -Destination "$PSScriptRoot\..\msaccess\Virtual Hard Disks\template.vhdx" -Force |
+    Move-Item -Destination "$PSScriptRoot\..\msaccess\Virtual Hard Disks\template.vhdx" -Force |
     Out-Null
 
 $old = Get-Location
@@ -51,7 +35,7 @@ Set-Location $old
 Write-Host '[done]' -ForegroundColor Green
 
 
-Write-Host 'Removeing temp ' -ForegroundColor Cyan -NoNewline
+Write-Host 'Removing temp ' -ForegroundColor Cyan -NoNewline
 Remove-Item $env:TEMP\vm -Force -Recurse -ErrorAction SilentlyContinue
 Remove-Item $env:TEMP\vm.zip -Force -Recurse -ErrorAction SilentlyContinue
 Write-Host '[done]' -ForegroundColor Green

@@ -65,15 +65,30 @@ param (
                ValueFromPipelineByPropertyName=$true,
                HelpMessage="Set a snapshot after successful stage.")]
     [switch]
-    $UseSnapshots
+    $UseSnapshots,
+
+    [Parameter(Mandatory=$false,
+               ValueFromPipeline=$true,
+               ValueFromPipelineByPropertyName=$true)]
+    [switch]
+    $Force
 )
 Begin {
     $ErrorActionPreference = 'Stop'
-    if (-not ($VMDisk | Test-Path -PathType Leaf)) { throw "Parameter VMDisk: File '$VMDisk' not found." }
-    if ((Get-ChildItem $DataPath | Measure-Object).Count -le 0)  { throw "Parameter DataPath: File or directory '$DataPath' not found." }
-    if ((Get-ChildItem $SetupPath | Measure-Object).Count -le 0) { throw "Parameter SetupPath: File '$SetupPath' not found." }
 
-    if ($null -eq $Stage) { 
+    try {
+        if (-not ($VMDisk | Test-Path -PathType Leaf)) { throw "Parameter VMDisk: File '$VMDisk' not found." }
+        if ((Get-ChildItem $DataPath | Measure-Object).Count -le 0)  { throw "Parameter DataPath: File or directory '$DataPath' not found." }
+        if ((Get-ChildItem $SetupPath | Measure-Object).Count -le 0) { throw "Parameter SetupPath: File '$SetupPath' not found." }
+    } catch {
+        if ($Force) {
+            Write-Warning $_
+        } else {
+            throw
+        }
+    }
+
+    if ($null -eq $Stage) {
         $ParameterList = (Get-Command -Name "$PSScriptRoot/$($MyInvocation.MyCommand)").Parameters
         $Stages = $ParameterList["Stage"].Attributes.ValidValues
     } else {
@@ -88,7 +103,7 @@ Process {
     foreach ($Stage in $Stages) {
         if (-not $OmitStagePrinting) { Write-Host "== Stage $Stage ==" -ForegroundColor Cyan }
 
-        if ($Stage -eq "1") {    
+        if ($Stage -eq "1") {
             & $PSScriptRoot/../common/New-VM.ps1 `
                 -VMName $VMName `
                 -VMDisk $VMDisk `
@@ -149,7 +164,7 @@ Process {
                 }
                 Invoke-Sqlcmd "
                 USE [master]
-                EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', N'Software\Microsoft\MSSQLServer\MSSQLServer', N'LoginMode', REG_DWORD, 2        
+                EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', N'Software\Microsoft\MSSQLServer\MSSQLServer', N'LoginMode', REG_DWORD, 2
                 ALTER LOGIN [sa] WITH PASSWORD=N'rocom'
                 ALTER LOGIN [sa] ENABLE
                 "
@@ -183,10 +198,10 @@ Process {
                 }
                 $databases = Invoke-Sqlcmd "SELECT database_id, name FROM sys.databases WHERE database_id > 4" | ForEach-Object name
                 
-                $databases | ForEach-Object { 
+                $databases | ForEach-Object {
                     Invoke-Sqlcmd "
-                    DECLARE @kill varchar(8000) = '';  
-                    SELECT @kill = @kill + 'kill ' + CONVERT(varchar(5), session_id) + ';'  
+                    DECLARE @kill varchar(8000) = '';
+                    SELECT @kill = @kill + 'kill ' + CONVERT(varchar(5), session_id) + ';'
                     FROM sys.dm_exec_sessions
                     WHERE database_id  = db_id('$_')
                     
@@ -265,14 +280,14 @@ Process {
                     "Invoke-SqlCmd:Password" = "rocom"
                     "Invoke-SqlCmd:Username" = "sa"
                 }
-                Invoke-Sqlcmd "SELECT database_id, name FROM sys.databases WHERE database_id > 4" | ForEach-Object { 
+                Invoke-Sqlcmd "SELECT database_id, name FROM sys.databases WHERE database_id > 4" | ForEach-Object {
                     Invoke-Sqlcmd "DROP DATABASE [$($_.name)];"
                 }
                 
                 Get-ChildItem "H:/DATA" -ErrorAction SilentlyContinue | Remove-Item -Force
                 New-Item -Type Directory -Path "H:/DATA" -ErrorAction SilentlyContinue | Out-Null
 
-                Get-ChildItem H:/*.bak | ForEach-Object {            
+                Get-ChildItem H:/*.bak | ForEach-Object {
                     $files = Invoke-Sqlcmd "RESTORE FILELISTONLY FROM DISK = '$($_.FullName)'"
                     $dat = ($files | Where-Object { $_.Type -eq 'D' }).LogicalName
                     $log = ($files | Where-Object { $_.Type -eq 'L' }).LogicalName
@@ -287,7 +302,7 @@ Process {
                 }
 
                 $databases = Invoke-Sqlcmd "SELECT name FROM sys.databases WHERE database_id > 4" | ForEach-Object { $_.name }
-                $databases | ForEach-Object { 
+                $databases | ForEach-Object {
                     Invoke-Sqlcmd `
                         -Database $_ `
                         -Query "UPDATE ZR_Account SET PASSWORT = 'B70F9CC091B8F5B44BBF0B4472CDED0F402CCDDF'" `
@@ -302,7 +317,7 @@ Process {
                     "Invoke-SqlCmd:ServerInstance" = ".\SQLEXPRESS"
                     "Invoke-SqlCmd:Password" = "rocom"
                     "Invoke-SqlCmd:Username" = "sa"
-                }' 
+                }'
                 
                 New-Item "$env:USERPROFILE\Documents\PowerShell" -ItemType Directory -ErrorAction SilentlyContinue | Out-Null
                 $script | Set-Content "$env:USERPROFILE\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"
@@ -316,9 +331,9 @@ Process {
         if ($Stage -eq "8") {
             Write-Host 'Restarting VM ' -ForegroundColor Cyan -NoNewline
             try {
-                Invoke-Command -Session $session -ScriptBlock { 
+                Invoke-Command -Session $session -ScriptBlock {
                     Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -InformationAction Quiet
-                    Restart-Computer -Force 
+                    Restart-Computer -Force
                 }
             } catch { }
             while ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
@@ -326,7 +341,7 @@ Process {
             
             Write-Host 'Connecting RDP ' -ForegroundColor Cyan -NoNewline
             while ($null -eq ((Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1)) { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
-            $IpAddress = (Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1 
+            $IpAddress = (Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1
             while (-not (Test-NetConnection $IpAddress -Port 3389 -InformationLevel Quiet)) { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
             Start-Sleep 10
             mstsc /v:$IpAddress
@@ -334,7 +349,7 @@ Process {
         }
 
 
-        if ($UseSnapshots) { 
+        if ($UseSnapshots) {
             Get-VMSnapshot -VMName $VMName | Remove-VMSnapshot
             Checkpoint-VM -Name $VMName -SnapshotName "after installer stage $Stage"
         }
