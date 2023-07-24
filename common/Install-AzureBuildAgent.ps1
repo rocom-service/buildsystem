@@ -35,9 +35,9 @@ $session = New-PSSession -Credential $credentials -VMName $VMName
 
 Write-Host 'Copying Azure Pipelines agent installation media ' -ForegroundColor Cyan -NoNewline
 Write-Host ''
-Copy-VMFile -VMName $VMName -CreateFullPath -FileSource Host -SourcePath "$ScriptRoot/../azure_token.txt"   -DestinationPath "H:/azp/azure_token.txt"
-Copy-VMFile -VMName $VMName -CreateFullPath -FileSource Host -SourcePath "$ScriptRoot/../azure_url.txt"     -DestinationPath "H:/azp/azure_url.txt"
-Copy-VMFile -VMName $VMName -CreateFullPath -FileSource Host -SourcePath "$ScriptRoot/Start-Agent.ps1"      -DestinationPath "H:/Start-Agent.ps1"
+Copy-VMFile -VMName $VMName -CreateFullPath -FileSource Host -SourcePath "$ScriptRoot/../azure_token.txt"   -DestinationPath "H:/azp/azure_token.txt" -Force
+Copy-VMFile -VMName $VMName -CreateFullPath -FileSource Host -SourcePath "$ScriptRoot/../azure_url.txt"     -DestinationPath "H:/azp/azure_url.txt"   -Force
+Copy-VMFile -VMName $VMName -CreateFullPath -FileSource Host -SourcePath "$ScriptRoot/Start-Agent.ps1"      -DestinationPath "H:/Start-Agent.ps1"     -Force
 Write-Host '[done]' -ForegroundColor Green
 
 Invoke-Command -Session $session -ScriptBlock {
@@ -52,8 +52,14 @@ Invoke-Command -Session $session -ScriptBlock {
     Write-Host 'Downloading and installing Azure Pipelines agent ' -ForegroundColor Cyan -NoNewline
     Remove-Item "H:/azp/agent" -Force -Recurse -ErrorAction SilentlyContinue
     if (-not (Test-Path "H:/$filename")) {
-        $wc = New-Object System.Net.WebClient
-        $wc.DownloadFile($packageUrl, "H:/$filename")
+        try {
+            $wc = New-Object System.Net.WebClient
+            $wc.DownloadFile($packageUrl, "H:/$filename")
+        } catch {
+            Start-Sleep -Seconds 10
+            $wc = New-Object System.Net.WebClient
+            $wc.DownloadFile($packageUrl, "H:/$filename")
+        }
     }
     Expand-Archive -Path "H:/$filename" -DestinationPath "H:/azp/agent"
     Write-Host '[done]' -ForegroundColor Green

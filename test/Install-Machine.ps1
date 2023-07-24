@@ -44,7 +44,7 @@ param (
                ValueFromPipelineByPropertyName=$true,
                HelpMessage="Path to the setup.")]
     [string]
-    $SetupPath = "$PSScriptRoot/setup*.exe",
+    $SetupPath = "$PSScriptRoot/*.msi",
 
     [Parameter(Mandatory=$false,
                ValueFromPipeline=$false,
@@ -93,9 +93,11 @@ Begin {
         $Stages = $ParameterList["Stage"].Attributes.ValidValues
     } else {
         $Stages = $Stage
-        Get-VMSnapshot -VMName $VMName `
-            | Where-Object Name -EQ "after installer stage $($Stage[0] - 1)" `
-            | Restore-VMSnapshot
+        if (1 -notin $Stages) {
+            Get-VMSnapshot -VMName $VMName `
+                | Where-Object Name -EQ "after installer stage $($Stage[0] - 1)" `
+                | Restore-VMSnapshot
+        }
     }
 }
 
@@ -116,8 +118,7 @@ Process {
                 -VMName $VMName `
                 -ScriptRoot $PSScriptRoot `
                 -User $User `
-                -Password $Password `
-                -IPAddress 192.168.2.80
+                -Password $Password
         }
 
         if ($Stage -eq "3") {
@@ -175,16 +176,31 @@ Process {
 
         if ($Stage -eq "6") {
             Write-Host 'Copying Tau-Office Setup ' -ForegroundColor Cyan -NoNewline
-            Copy-VMFile -VMName $VMName -SourcePath (Get-ChildItem "$SetupPath" | Select-Object -First 1) -DestinationPath "H:/setup.exe" -CreateFullPath -FileSource Host
+            $extension = (Get-ChildItem $SetupPath | Select-Object -First 1).Extension
+            Copy-VMFile -VMName $VMName -SourcePath (Get-ChildItem "$SetupPath" | Select-Object -First 1) -DestinationPath "H:/setup$extension" -CreateFullPath -FileSource Host
             Write-Host '[done]' -ForegroundColor Green
 
-            Invoke-Command -Session $session -ScriptBlock {
-                Write-Host "Installing Tau-Office " -ForegroundColor Cyan -NoNewline
-                & "H:/setup.exe" /S /A
-                Start-Sleep -Seconds 1
-                (Get-Process setup).WaitForExit()
-                Remove-Item "H:/setup.exe"
-                Write-Host 'done' -ForegroundColor Green
+            switch ($extension) {
+                ".msi" {
+                    Invoke-Command -Session $session -ScriptBlock {
+                        Write-Host "Installing Tau-Office " -ForegroundColor Cyan -NoNewline
+                        msiexec /log H:/setup.log /i H:/setup.msi
+                        Write-Host 'done' -ForegroundColor Green
+                    }
+                }
+                ".exe" {
+                    Invoke-Command -Session $session -ScriptBlock {
+                        Write-Host "Installing Tau-Office " -ForegroundColor Cyan -NoNewline
+                        & "H:/setup.exe" /S /A
+                        Start-Sleep -Seconds 1
+                        (Get-Process setup).WaitForExit()
+                        Remove-Item "H:/setup.exe"
+                        Write-Host 'done' -ForegroundColor Green
+                    }
+                }
+                default {
+                    Write-Host -ForegroundColor Red "This Script can not install $extension-files."
+                }
             }
         }
 

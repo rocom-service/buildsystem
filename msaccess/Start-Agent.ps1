@@ -14,11 +14,11 @@ if (-not (Test-Path "$PSScriptRoot\azp\environment.json")) {
   exit 1
 }
 
-Get-Content "$PSScriptRoot\azp\environment.json" | 
+Get-Content "$PSScriptRoot\azp\environment.json" |
   ConvertFrom-Json |
-  ForEach-Object { 
+  ForEach-Object {
     $obj = $_
-    $obj | 
+    $obj |
       Get-Member -MemberType NoteProperty |
       ForEach-Object {
         [PSCustomObject]@{
@@ -33,8 +33,8 @@ $old = Get-Location
 Set-Location "$PSScriptRoot\azp\agent"
 
 $work = if (Test-Path Env:AZP_WORK) { ${Env:AZP_WORK} } else { '_work' }
-Get-ChildItem .\_work\ -Directory -ErrorAction SilentlyContinue | 
-    Where-Object { $_.Name -match "\d+" } | 
+Get-ChildItem .\_work\ -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match "\d+" } |
     Remove-Item -Recurse -Force
 
 try

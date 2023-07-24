@@ -86,12 +86,11 @@ Process {
                 -VMName $VMName `
                 -ScriptRoot $PSScriptRoot `
                 -User $User `
-                -Password $Password `
-                -IPAddress 192.168.2.95
+                -Password $Password
         }
 
         if ($Stage -eq "3") {
-            Write-Host 'Copying Microsoft Visual Basic installation media ' -ForegroundColor Cyan -NoNewline
+            Write-Host 'Copying Installation Media ' -ForegroundColor Cyan -NoNewline
             Write-Host ''
 
             $zip = "$PSScriptRoot\temp.zip"
@@ -99,7 +98,8 @@ Process {
                 Compress-Archive -DestinationPath $zip -Path "$PSScriptRoot/1VS60Ent"`
                                                         , "$PSScriptRoot/3SP6_VSEnt"`
                                                         , "$PSScriptRoot/install.ps1"`
-                                                        , "$PSScriptRoot/Key.txt"
+                                                        , "$PSScriptRoot/Key.txt"`
+                                                        , "$PSScriptRoot/BeforeSetup"
             }
 
             Copy-VMFile -VMName $VMName -SourcePath $zip -DestinationPath "H:/temp.zip" -CreateFullPath -FileSource Host
@@ -107,12 +107,24 @@ Process {
             Invoke-Command -Session $session -ScriptBlock {
                 Remove-Item -Force -Recurse -ErrorAction SilentlyContinue "H:/1VS60Ent"
                 Remove-Item -Force -Recurse -ErrorAction SilentlyContinue "H:/3SP6_VSEnt"
+                Remove-Item -Force -Recurse -ErrorAction SilentlyContinue "H:/BeforeSetup"
                 Expand-Archive -Force -Path "H:/temp.zip" -DestinationPath "H:/"
                 Remove-Item -Force -ErrorAction SilentlyContinue "H:/temp.zip"
             }
             Remove-Item -Force -ErrorAction SilentlyContinue $zip
             Write-Host '[done]' -ForegroundColor Green
             
+            Invoke-Command -Session $session -ScriptBlock {
+                Push-Location "H:/BeforeSetup"
+                Get-ChildItem "H:/BeforeSetup/*.msi" |
+                    ForEach-Object {
+                        Write-Host "Installing $($_.Name)" -ForegroundColor Cyan -NoNewline
+                        msiexec.exe /I "$($_.FullName)"
+                        Write-Host '[done]' -ForegroundColor Green
+                    }
+                Pop-Location
+
+            }
             Invoke-Command -Session $session -ScriptBlock {
                 Write-Host "Installing Microsoft Visual Basic 6 " -ForegroundColor Cyan -NoNewline
 
@@ -130,6 +142,7 @@ Process {
                 [System.IO.File]::WriteAllBytes($file, $bytes)
             }
 
+            Write-Host
             Write-Host "************************************************" -ForegroundColor Magenta
             Write-Host " We need a logged in user to install vb6!       " -ForegroundColor Magenta
             Write-Host " Please log into the vm and run H:\install.ps1 ." -ForegroundColor Magenta
@@ -139,7 +152,13 @@ Process {
             Write-Host "************************************************" -ForegroundColor Magenta
             Read-Host "Press Enter to connect ..."
 
-            mstsc /v:'192.168.2.95'
+            Write-Host 'Connecting RDP ' -ForegroundColor Cyan -NoNewline
+            while ($null -eq ((Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1)) { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
+            $IpAddress = (Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1
+            while (-not (Test-NetConnection $IpAddress -Port 3389 -InformationLevel Quiet)) { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
+            Start-Sleep 10
+            mstsc /v:$IpAddress
+            Write-Host '[done]' -ForegroundColor Green
             
             Invoke-Command -Session $session -ScriptBlock {
                 if (Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\VB98\VB6.EXE') {
@@ -206,7 +225,9 @@ Process {
             
             $session = New-PSSession -Credential $credentials -VMName $VMName
 
-            Invoke-Command -Session $session -ScriptBlock {
+            Invoke-Command -Session $session -ArgumentList $VMName -ScriptBlock {
+                param($VMName)
+
                 Write-Host 'Define additional environment variabales for usage in azure pipelines ' -ForegroundColor Cyan -NoNewline
                 @{
                     AZP_AGENT_NAME   = "$VMName"
@@ -217,8 +238,8 @@ Process {
                 } |
                     ConvertTo-Json |
                     Set-Content -Force -Path "H:/azp/environment.json"
+                Write-Host '[done]' -ForegroundColor Green
             }
-            Write-Host '[done]' -ForegroundColor Green
         }
 
         if ($Stage -eq "6") {

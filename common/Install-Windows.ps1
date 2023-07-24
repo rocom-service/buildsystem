@@ -28,21 +28,20 @@ param (
                ValueFromPipelineByPropertyName=$true)]
     [ValidateNotNullOrEmpty()]
     [string]
-    $ScriptRoot,
-
-    [Parameter(Mandatory=$true,
-               ValueFromPipeline=$true,
-               ValueFromPipelineByPropertyName=$true)]
-    [ValidateNotNullOrEmpty()]
-    [string]
-    $IPAddress
+    $ScriptRoot
 )
 $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
 $session = New-PSSession -Credential $credentials -VMName $VMName
 
 Write-Host 'Initial Windows setup ' -ForegroundColor Cyan -NoNewline
-Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$IPAddress -ScriptBlock {
-    param($User,$Password,$VMName,$IPAddress)
+$Gateway = Get-NetIPAddress -AddressFamily IPv4 |
+                Where-Object InterfaceAlias -Like "*Default Switch*" |
+                ForEach-Object IPAddress
+
+Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$Gateway -ScriptBlock {
+    param($User,$Password,$VMName,$Gateway)
+
+    Rename-Computer $($VMName -replace " ","") -Force
 
     $WindowsUpdatePath = "HKLM:SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\"
     $AutoUpdatePath = "HKLM:SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
@@ -86,12 +85,26 @@ Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$IPAddres
     ) | Add-Content -Path C:\Windows\System32\drivers\etc\hosts
 
     # set fixed ip address
-    Get-NetIPAddress -PrefixLength 24 |
+    Get-NetIPAddress -AddressFamily IPv4 |
+        Select-Object -First 1 |
         ForEach-Object {
-            Set-NetIPAddress `
+            if (! $_.IPAddress.StartsWith("192.")) {
+                $Address = @(
+                            $Gateway.Split(".") | Select-Object -First 3
+                            $_.IPAddress.Split(".") | Select-Object -Last 1
+                        ) -join "."
+                New-NetIPAddress `
+                    -InterfaceIndex $_.InterfaceIndex `
+                    -AddressFamily IPv4 `
+                    -IPAddress $Address `
+                    -DefaultGateway $Gateway `
+                    -PrefixLength 24 |
+                        Out-Null
+            }
+
+            Set-DnsClientServerAddress `
                 -InterfaceIndex $_.InterfaceIndex `
-                -IPAddress $IPAddress `
-                -PrefixLength 24
+                -ServerAddresses "8.8.8.8","8.8.4.4"
         }
     
     # login without password

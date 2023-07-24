@@ -77,8 +77,7 @@ Process {
                 -VMName $VMName `
                 -ScriptRoot $PSScriptRoot `
                 -User $User `
-                -Password $Password `
-                -IPAddress 192.168.2.82
+                -Password $Password
         }
 
         if ($Stage -eq "3") {
@@ -157,11 +156,24 @@ Process {
                     Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
                 }
                 else {
-                    choco feature disable --name showDownloadProgress
-                    cup chocolatey -y
+                    @(
+                        "choco feature disable --name showDownloadProgress"
+                        "choco feature disable --name exitOnRebootDetected"
+                        "cup chocolatey -y"
+                    ) |
+                        ForEach-Object {
+                            Write-Host -ForegroundColor Cyan "  $_"
+                            Invoke-Expression $_
+                        }
                 }
-                choco install -y nuget.commandline --version=4.9.4
-                choco install -y git
+                @(
+                    "choco install -y nuget.commandline --version=4.9.4"
+                    "choco install -y git"
+                ) |
+                    ForEach-Object {
+                        Write-Host -ForegroundColor Cyan "  $_"
+                        Invoke-Expression $_
+                    }
                 Write-Host '[done]' -ForegroundColor Green
                 
                 Write-Host 'Define additional environment variabales for usage in azure pipelines ' -ForegroundColor Cyan -NoNewline
