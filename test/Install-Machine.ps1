@@ -150,12 +150,36 @@ Process {
         $session = New-PSSession -Credential $credentials -VMName $VMName
 
         if ($Stage -eq "5") {
-            Write-Host 'Installing sql server ' -ForegroundColor Cyan -NoNewline
-            Invoke-Command -Session $session -ScriptBlock {
-                choco install sql-server-express 7zip.commandline -y
-            } | Write-Debug
-            Write-Host '[done]' -ForegroundColor Green
-            
+            Write-Host 'Installing tools ' -ForegroundColor Cyan
+            Write-Progress -Activity "Installing tools"
+            $tools = @(
+                "7zip.commandline"
+                "dotnet-6.0-desktopruntime"
+                "dotnetfx"
+                "gsudo"
+                "sql-server-express"
+            )
+            Invoke-Command -Session $session -ArgumentList ($tools -join " ") -ScriptBlock {
+                param($arguments)
+                choco install $($arguments -split " ") -y
+            } |
+            Where-Object Length -gt 0 |
+            ForEach-Object {
+                    $line = $_
+                    Write-Progress -Activity "Installing tools" -Status $line
+                    Write-Debug $line
+                    foreach ($i in $tools) {
+                        if ($line.Contains($i) -and !$line.Contains(";")) {
+                            Write-Host $line
+                        }
+                    }
+                } `
+                -End {
+                    Write-Progress -Activity "Installing tools" -Completed
+                    Write-Host '[done]' -ForegroundColor Green
+                }
+
+
             # restart session
             $session = New-PSSession -Credential $credentials -VMName $VMName
 
@@ -175,22 +199,56 @@ Process {
         }
 
         if ($Stage -eq "6") {
-            Write-Host 'Copying Tau-Office Setup ' -ForegroundColor Cyan -NoNewline
-            $extension = (Get-ChildItem $SetupPath | Select-Object -First 1).Extension
-            Copy-VMFile -VMName $VMName -SourcePath (Get-ChildItem "$SetupPath" | Select-Object -First 1) -DestinationPath "H:/setup$extension" -CreateFullPath -FileSource Host
+            $file = (Get-ChildItem $SetupPath | Select-Object -First 1)
+
+            Write-Host 'Copying Setup ' -ForegroundColor Cyan -NoNewline
+            Invoke-Command -Session $session -ArgumentList "H:/setup" -ScriptBlock {
+                param($path)
+                Get-ChildItem "$path.*" -ErrorAction SilentlyContinue | Remove-Item -Force
+            }
+            Copy-VMFile -VMName $VMName -SourcePath $file -DestinationPath "H:/setup$($file.Extension)" -CreateFullPath -FileSource Host
             Write-Host '[done]' -ForegroundColor Green
 
-            switch ($extension) {
+            switch ($file.Extension) {
                 ".msi" {
                     Invoke-Command -Session $session -ScriptBlock {
-                        Write-Host "Installing Tau-Office " -ForegroundColor Cyan -NoNewline
-                        msiexec /log H:/setup.log /i H:/setup.msi
-                        Write-Host 'done' -ForegroundColor Green
+                        $file = "H:\setup.lnk"
+                        $WshShell = New-Object -comObject WScript.Shell
+                        $Shortcut = $WshShell.CreateShortcut($file)
+                        $Shortcut.TargetPath = (Get-Command msiexec).Path
+                        $Shortcut.Arguments = "/I H:\setup.msi /l* H:\setup.log INSTALLFOLDER=`"C:\Program Files (x86)\Tau-Office`""
+                        $Shortcut.WindowStyle = 3
+                        $Shortcut.WorkingDirectory = "H:\"
+                        $Shortcut.Save()
+
+                        $bytes = [System.IO.File]::ReadAllBytes($file)
+                        $bytes[0x15] = $bytes[0x15] -bor 0x20 #set byte 21 (0x15) bit 6 (0x20) ON (Use –bor to set RunAsAdministrator option and –bxor to unset)
+                        [System.IO.File]::WriteAllBytes($file, $bytes)
                     }
+
+                    Write-Host
+                    Write-Host "************************************************" -ForegroundColor Magenta
+                    Write-Host " We need a logged in user to install tau-office!" -ForegroundColor Magenta
+                    Write-Host " Please log into the vm and run H:\setup.lnk .  " -ForegroundColor Magenta
+                    Write-Host "                                                " -ForegroundColor Magenta
+                    Write-Host " User:     $User                                " -ForegroundColor Magenta
+                    Write-Host " Password: $Password                            " -ForegroundColor Magenta
+                    Write-Host "************************************************" -ForegroundColor Magenta
+                    Read-Host "Press Enter to connect ..."
+
+                    Write-Host 'Connecting RDP ' -ForegroundColor Cyan -NoNewline
+                    while ($null -eq ((Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1)) { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
+                    $IpAddress = (Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1
+                    while (-not (Test-NetConnection $IpAddress -Port 3389 -InformationLevel Quiet)) { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
+                    Start-Sleep 10
+                    mstsc /v:$IpAddress
+                    Write-Host '[done]' -ForegroundColor Green
+
+                    Read-Host "Press Enter to continue ..."
                 }
                 ".exe" {
                     Invoke-Command -Session $session -ScriptBlock {
-                        Write-Host "Installing Tau-Office " -ForegroundColor Cyan -NoNewline
+                        Write-Host "Installing " -ForegroundColor Cyan -NoNewline
                         & "H:/setup.exe" /S /A
                         Start-Sleep -Seconds 1
                         (Get-Process setup).WaitForExit()
@@ -213,14 +271,14 @@ Process {
                     "Invoke-SqlCmd:Username" = "sa"
                 }
                 $databases = Invoke-Sqlcmd "SELECT database_id, name FROM sys.databases WHERE database_id > 4" | ForEach-Object name
-                
+
                 $databases | ForEach-Object {
                     Invoke-Sqlcmd "
                     DECLARE @kill varchar(8000) = '';
                     SELECT @kill = @kill + 'kill ' + CONVERT(varchar(5), session_id) + ';'
                     FROM sys.dm_exec_sessions
                     WHERE database_id  = db_id('$_')
-                    
+
                     EXEC(@kill);
 
                     DROP DATABASE [$_];"
@@ -299,7 +357,7 @@ Process {
                 Invoke-Sqlcmd "SELECT database_id, name FROM sys.databases WHERE database_id > 4" | ForEach-Object {
                     Invoke-Sqlcmd "DROP DATABASE [$($_.name)];"
                 }
-                
+
                 Get-ChildItem "H:/DATA" -ErrorAction SilentlyContinue | Remove-Item -Force
                 New-Item -Type Directory -Path "H:/DATA" -ErrorAction SilentlyContinue | Out-Null
 
@@ -334,10 +392,10 @@ Process {
                     "Invoke-SqlCmd:Password" = "rocom"
                     "Invoke-SqlCmd:Username" = "sa"
                 }'
-                
+
                 New-Item "$env:USERPROFILE\Documents\PowerShell" -ItemType Directory -ErrorAction SilentlyContinue | Out-Null
                 $script | Set-Content "$env:USERPROFILE\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"
-                
+
                 New-Item "$env:USERPROFILE\Documents\WindowsPowerShell" -ItemType Directory -ErrorAction SilentlyContinue | Out-Null
                 $script | Set-Content "$env:USERPROFILE\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
             }
@@ -354,7 +412,7 @@ Process {
             } catch { }
             while ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
             Write-Host '[done]' -ForegroundColor Green
-            
+
             Write-Host 'Connecting RDP ' -ForegroundColor Cyan -NoNewline
             while ($null -eq ((Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1)) { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
             $IpAddress = (Get-VM $VMName).NetworkAdapters.IPAddresses | Select-Object -First 1

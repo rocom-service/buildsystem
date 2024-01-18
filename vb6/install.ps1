@@ -70,7 +70,7 @@ if (!(Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\6.0\Setup\Vis
 
 # install Visual Basic 6
 Set-Location "$PSScriptRoot\1VS60Ent\"
-$cmd = '"' + $PSScriptRoot + '1VS60Ent\ACMSetup.Exe"'
+$cmd = '"' + $PSScriptRoot + '\1VS60Ent\ACMSetup.Exe"'
 $arguments = '/k ' + $vs_key + ' /n "' + $vs_name + '" /o "' + $vs_organisation + '" /T vb6only.STF  /B 1 /GC "' + $env:temp + '\install_vb6.log" /QNT'
 Write-Host -ForegroundColor Yellow $cmd $arguments
 Start-Process $cmd -ArgumentList $arguments -Verb RunAs -Wait
@@ -82,7 +82,7 @@ Copy-Item "$PSScriptRoot\1VS60Ent\vb6only.STF" "$PSScriptRoot\3SP6_VSEnt\ACMSetu
 Copy-Item "$PSScriptRoot\1VS60Ent\vb6only.STF" "$PSScriptRoot\3SP6_VSEnt\vb6only.STF"
 
 Set-Location "$PSScriptRoot\3SP6_VSEnt"
-$cmd = '"' + $PSScriptRoot + '3SP6_VSEnt\setupsp6.Exe"'
+$cmd = '"' + $PSScriptRoot + '\3SP6_VSEnt\setupsp6.Exe"'
 $arguments = '/k ' + $vs_key + ' /n "' + $vs_name + '" /o "' + $vs_organisation + '" /B 1 /GC "' + $env:temp + '\install_sp6.log" /QNT'
 Write-Host -ForegroundColor Yellow $cmd $arguments
 Start-Process $cmd -ArgumentList $arguments -Verb RunAs -Wait
