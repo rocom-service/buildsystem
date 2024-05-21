@@ -1,4 +1,4 @@
-﻿#Requires -PSEdition Core
+#Requires -PSEdition Core
 [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "")]
 [CmdletBinding()]
 param (
@@ -60,6 +60,7 @@ Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$Gateway 
     Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate" "OSUpgrade" -Value 0 -Type DWord
 
     # stop Windows Update Service
+    while (!(Get-Service wuauserv)) { Start-Sleep 1 }
     Stop-Service wuauserv
     Set-Service wuauserv -StartupType Disabled
 
@@ -106,7 +107,7 @@ Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$Gateway 
                 -InterfaceIndex $_.InterfaceIndex `
                 -ServerAddresses "8.8.8.8","8.8.4.4"
         }
-    
+
     # login without password
     Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "AutoAdminLogon" -Value "1" -Type String
     Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultUsername" -Value $User -Type String

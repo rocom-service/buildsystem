@@ -113,7 +113,7 @@ Process {
             }
             Remove-Item -Force -ErrorAction SilentlyContinue $zip
             Write-Host '[done]' -ForegroundColor Green
-            
+
             Invoke-Command -Session $session -ScriptBlock {
                 Push-Location "H:/BeforeSetup"
                 Get-ChildItem "H:/BeforeSetup/*.msi" |
@@ -136,7 +136,7 @@ Process {
                 $Shortcut.WindowStyle = 3
                 $Shortcut.WorkingDirectory = "H:\"
                 $Shortcut.Save()
-                
+
                 $bytes = [System.IO.File]::ReadAllBytes($file)
                 $bytes[0x15] = $bytes[0x15] -bor 0x20 #set byte 21 (0x15) bit 6 (0x20) ON (Use –bor to set RunAsAdministrator option and –bxor to unset)
                 [System.IO.File]::WriteAllBytes($file, $bytes)
@@ -159,7 +159,7 @@ Process {
             Start-Sleep 10
             mstsc /v:$IpAddress
             Write-Host '[done]' -ForegroundColor Green
-            
+
             Invoke-Command -Session $session -ScriptBlock {
                 if (Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\VB98\VB6.EXE') {
                     Write-Host '[skiped]' -ForegroundColor Red
@@ -186,7 +186,7 @@ Process {
                 while ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
                 Write-Host ' [done]' -ForegroundColor Green
             }
-            
+
             $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
             $session = New-PSSession -Credential $credentials -VMName $VMName
             Invoke-Command -Session $session -ScriptBlock {
@@ -220,9 +220,14 @@ Process {
                 choco install -y git
                 choco install -y windows-sdk-10.1
                 choco install -y pwsh
+                choco install -y azure-cli
                 Write-Host '[done]' -ForegroundColor Green
+
+                # add azure-cli to path
+                $newPath = (Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment' -Name PATH).path + ";C:\Program Files (x86)\Microsoft Visual Studio\VB98\"
+                Set-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment' -Name PATH -Value $newPath
             }
-            
+
             $session = New-PSSession -Credential $credentials -VMName $VMName
 
             Invoke-Command -Session $session -ArgumentList $VMName -ScriptBlock {
@@ -235,6 +240,7 @@ Process {
                     VisualBasic      = "$((Get-Command vb6).Version.ToString())"
                     Git              = "$((Get-Command git).Version.ToString())"
                     Nuget            = "$((Get-Command nuget).Version.ToString())"
+                    AzureCli         = "$((Get-Command az).Version.ToString())"
                 } |
                     ConvertTo-Json |
                     Set-Content -Force -Path "H:/azp/environment.json"

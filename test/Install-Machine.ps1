@@ -3,55 +3,55 @@
 [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "")]
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory=$false,
-               ValueFromPipeline=$true,
-               ValueFromPipelineByPropertyName=$true)]
-    [ValidateNotNullOrEmpty()]
-    [string]
-    $VMName = "Testsystem",
+        [Parameter(Mandatory=$false,
+            ValueFromPipeline=$true,
+            ValueFromPipelineByPropertyName=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $VMName = "Testsystem",
 
-    [Parameter(Mandatory=$false,
-               ValueFromPipeline=$true,
-               ValueFromPipelineByPropertyName=$true)]
-    [ValidateNotNullOrEmpty()]
-    [string]
-    $User = "IEUser",
+        [Parameter(Mandatory=$false,
+            ValueFromPipeline=$true,
+            ValueFromPipelineByPropertyName=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $User = "IEUser",
 
-    [Parameter(Mandatory=$false,
-               ValueFromPipeline=$true,
-               ValueFromPipelineByPropertyName=$true)]
-    [ValidateNotNullOrEmpty()]
-    [string]
-    $Password = "Passw0rd!",
+        [Parameter(Mandatory=$false,
+            ValueFromPipeline=$true,
+            ValueFromPipelineByPropertyName=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Password = "Passw0rd!",
 
-    [Parameter(Mandatory=$false,
-               ValueFromPipeline=$true,
-               ValueFromPipelineByPropertyName=$true,
-               HelpMessage="Path to vhdx drive template.")]
-    [Alias("PSPath")]
-    [string]
-    $VMDisk = "$PSScriptRoot/Virtual Hard Disks/template.vhdx",
+        [Parameter(Mandatory=$false,
+                ValueFromPipeline=$true,
+                ValueFromPipelineByPropertyName=$true,
+                HelpMessage="Path to vhdx drive template.")]
+        [Alias("PSPath")]
+        [string]
+        $VMDisk = "$PSScriptRoot/Virtual Hard Disks/template.vhdx",
 
-    [Parameter(Mandatory=$false,
-               ValueFromPipeline=$true,
-               ValueFromPipelineByPropertyName=$true,
-               HelpMessage="Path to data for the testsystem.")]
-    [string]
-    $DataPath = "$PSScriptRoot/*.zip",
+        [Parameter(Mandatory=$false,
+                ValueFromPipeline=$true,
+                ValueFromPipelineByPropertyName=$true,
+                HelpMessage="Path to data for the testsystem.")]
+        [string]
+        $DataPath = "$PSScriptRoot/*.zip",
 
-    [Parameter(Mandatory=$false,
-               ValueFromPipeline=$true,
-               ValueFromPipelineByPropertyName=$true,
-               HelpMessage="Path to the setup.")]
-    [string]
-    $SetupPath = "$PSScriptRoot/*.msi",
+        [Parameter(Mandatory=$false,
+                ValueFromPipeline=$true,
+                ValueFromPipelineByPropertyName=$true,
+                HelpMessage="Path to the setup.")]
+        [string]
+        $SetupPath = "$PSScriptRoot/*.msi",
 
-    [Parameter(Mandatory=$false,
-               ValueFromPipeline=$false,
-               ValueFromPipelineByPropertyName=$true)]
-    [ValidateSet("1", "2", "3", "4", "5", "6", "7", "8")]
-    [int[]]
-    $Stage,
+        [Parameter(Mandatory=$false,
+                ValueFromPipeline=$false,
+                ValueFromPipelineByPropertyName=$true)]
+        [ValidateSet("1", "2", "3", "4", "5", "6", "7", "8")]
+        [int[]]
+        $Stage,
 
     [Parameter(Mandatory=$false,
                ValueFromPipeline=$true,
@@ -105,6 +105,8 @@ Process {
     foreach ($Stage in $Stages) {
         if (-not $OmitStagePrinting) { Write-Host "== Stage $Stage ==" -ForegroundColor Cyan }
 
+        $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
+
         if ($Stage -eq "1") {
             & $PSScriptRoot/../common/New-VM.ps1 `
                 -VMName $VMName `
@@ -146,7 +148,6 @@ Process {
             Write-Host ' [done]' -ForegroundColor Green
         }
 
-        $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
         $session = New-PSSession -Credential $credentials -VMName $VMName
 
         if ($Stage -eq "5") {
@@ -179,10 +180,7 @@ Process {
                     Write-Host '[done]' -ForegroundColor Green
                 }
 
-
-            # restart session
             $session = New-PSSession -Credential $credentials -VMName $VMName
-
             Invoke-Command -Session $session -ScriptBlock {
                 $PSDefaultParameterValues = @{
                     "Invoke-SqlCmd:ServerInstance" = ".\SQLEXPRESS"
@@ -193,9 +191,19 @@ Process {
                 ALTER LOGIN [sa] WITH PASSWORD=N'rocom'
                 ALTER LOGIN [sa] ENABLE
                 "
-
-                Restart-Service MSSQL`$SQLEXPRESS
             }
+
+            Write-Host 'Restarting VM ' -ForegroundColor Cyan -NoNewline
+            try {
+                Invoke-Command -Session $session -ScriptBlock {
+                    Restart-Computer -Force
+                }
+            } catch { }
+            while ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
+            Write-Host '[done]' -ForegroundColor Green
+
+            # restart session
+            $session = New-PSSession -Credential $credentials -VMName $VMName
         }
 
         if ($Stage -eq "6") {
@@ -328,21 +336,39 @@ Process {
                     Remove-Item $_.FullName -Force
                 }
 
-                Get-ChildItem H:/ -Recurse -Include "*.bak" | Sort-Object { $_.Name.Length } | Select-Object -First 1 | ForEach-Object {
-                    $db  = [System.IO.Path]::GetFileNameWithoutExtension($_.Name).ToUpper()
+                Get-ChildItem H:/ -Recurse -Include "*.bak" | Sort-Object { $_.Name.Length } |
+                    Select-Object -First 1 |
+                    ForEach-Object {
+                        $db  = [System.IO.Path]::GetFileNameWithoutExtension($_.Name).ToUpper()
 
-                    $data = @(
-                        "[Datasource]"
-                        "SERVER=MSSQL"
-                        "Zugriff=STANDARD"
-                        "ODBC=JA"
-                        "Datenbank=$db"
-                        "INSTANCE=.\SQLEXPRESS"
-                        "USER=sa"
-                        "PASSWORT=rocom"
-                    ) | Out-String
-                    [System.IO.File]::WriteAllLines("C:\Program Files (x86)\Tau-Office\DATEN\Datenquelle.ini", $data, [System.Text.Encoding]::GetEncoding(1250))
+                        $data = @(
+                            "[Datasource]"
+                            "SERVER=MSSQL"
+                            "Zugriff=STANDARD"
+                            "ODBC=JA"
+                            "Datenbank=$db"
+                            "INSTANCE=.\SQLEXPRESS"
+                            "USER=sa"
+                            "PASSWORT=rocom"
+                        ) | Out-String
+                        [System.IO.File]::WriteAllLines("C:\Program Files (x86)\Tau-Office\DATEN\Datenquelle.ini", $data, [System.Text.Encoding]::GetEncoding(1250))
+                    }
+
+                if (!(Test-Path "C:\Program Files (x86)\Tau-Office\tau-office.ini.bak")) {
+                    Move-Item "C:\Program Files (x86)\Tau-Office\tau-office.ini" "C:\Program Files (x86)\Tau-Office\tau-office.ini.bak"
                 }
+
+                Get-Content "C:\Program Files (x86)\Tau-Office\tau-office.ini.bak" |
+                    ForEach-Object {
+                        if ($_.StartsWith("Mandantenpfad=")) {
+                            "Mandantenpfad=C:\Program Files (x86)\Tau-Office\Daten"
+                        } elseif ($_.StartsWith("Programmpfad=")) {
+                            "Programmpfad=C:\Program Files (x86)\Tau-Office"
+                        } else {
+                            $_
+                        }
+                    } |
+                    Set-Content "C:\Program Files (x86)\Tau-Office\tau-office.ini"
             }
             Write-Host '[done]' -ForegroundColor Green
 
