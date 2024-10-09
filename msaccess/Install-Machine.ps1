@@ -122,7 +122,7 @@ Process {
                 while ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
                 Write-Host ' [done]' -ForegroundColor Green
             }
-            
+
             Invoke-Command -Session $session -ScriptBlock {
                 Remove-Item -Force -Recurse -ErrorAction SilentlyContinue H:/setup
 
@@ -149,7 +149,7 @@ Process {
             Invoke-Command -Session $session -ArgumentList $VMName -ScriptBlock {
                 param($VMName)
 
-                Write-Host 'Install chocolatey and additional development tools ' -ForegroundColor Cyan -NoNewline
+                Write-Host 'Install chocolatey ' -ForegroundColor Cyan
                 [System.Environment]::SetEnvironmentVariable('chocolateyUseWindowsCompression', 'false', [System.EnvironmentVariableTarget]::Machine)
                 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
                 if ($null -eq (Get-Command choco -ErrorAction SilentlyContinue)) {
@@ -166,6 +166,27 @@ Process {
                             Invoke-Expression $_
                         }
                 }
+                Write-Host '[done]' -ForegroundColor Green
+            }
+
+            Write-Host 'Restarting VM ' -ForegroundColor Cyan -NoNewline
+            try {
+                Invoke-Command -Session $session -ScriptBlock { Restart-Computer -Force }
+            } catch { }
+            Start-Sleep -Seconds 2
+            if ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') {
+                while ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
+            }
+            Write-Host ' [done]' -ForegroundColor Green
+            $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
+            $session = New-PSSession -Credential $credentials -VMName $VMName
+
+            Invoke-Command -Session $session -ArgumentList $VMName -ScriptBlock {
+                param($VMName)
+
+                Write-Host 'Install additional development tools ' -ForegroundColor Cyan
+                [System.Environment]::SetEnvironmentVariable('chocolateyUseWindowsCompression', 'false', [System.EnvironmentVariableTarget]::Machine)
+                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
                 @(
                     "choco install -y nuget.commandline --version=4.9.4"
                     "choco install -y git"
@@ -175,7 +196,7 @@ Process {
                         Invoke-Expression $_
                     }
                 Write-Host '[done]' -ForegroundColor Green
-                
+
                 Write-Host 'Define additional environment variabales for usage in azure pipelines ' -ForegroundColor Cyan -NoNewline
                 @{
                     AZP_AGENT_NAME   = "$VMName"
@@ -209,9 +230,7 @@ Process {
         if ($Stage -eq "7") {
             Write-Host 'Restarting VM ' -ForegroundColor Cyan -NoNewline
             try {
-                Invoke-Command -Session $session -ScriptBlock {
-                    Restart-Computer -Force
-                }
+                Invoke-Command -Session $session -ScriptBlock { Restart-Computer -Force }
             } catch { }
             Write-Host '[done]' -ForegroundColor Green
         }
