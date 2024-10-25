@@ -110,10 +110,10 @@ Process {
                     $estimated = 530
                     while (-not (Get-Process setup).WaitForExit(3000)) {
                         $estimated -= 3
-                        Write-Progress -Activity "Installing Microsoft Access" -SecondsRemaining $estimated
+                        Write-Progress -Activity "." -SecondsRemaining $estimated
                     }
                     Write-Host '[done]' -ForegroundColor Green
-                    Write-Progress -Activity "Installing Microsoft Access" -Completed
+                    Write-Progress -Activity "." -Completed
                 }
             }
 
@@ -177,9 +177,17 @@ Process {
             if ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') {
                 while ((Get-VM -Name $VMName).Heartbeat -notlike 'OkApplications*') { Write-Host "." -ForegroundColor Cyan -NoNewLine ; Start-Sleep 1}
             }
+
+            $session = $null
+            while ($null -eq $session) {
+                try {
+                    $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
+                    $session = New-PSSession -Credential $credentials -VMName $VMName
+                } catch { }
+                Write-Host "." -ForegroundColor Cyan -NoNewLine
+                Start-Sleep 1
+            }
             Write-Host ' [done]' -ForegroundColor Green
-            $credentials = New-Object System.Management.Automation.PSCredential $User, (ConvertTo-SecureString $Password -AsPlainText -Force)
-            $session = New-PSSession -Credential $credentials -VMName $VMName
 
             Invoke-Command -Session $session -ArgumentList $VMName -ScriptBlock {
                 param($VMName)

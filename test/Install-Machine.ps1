@@ -184,6 +184,7 @@ Process {
             Invoke-Command -Session $session -ScriptBlock {
                 $PSDefaultParameterValues = @{
                     "Invoke-SqlCmd:ServerInstance" = ".\SQLEXPRESS"
+                    "Invoke-SqlCmd:TrustServerCertificate" = $true
                 }
                 Invoke-Sqlcmd "
                 USE [master]
@@ -277,6 +278,7 @@ Process {
                     "Invoke-SqlCmd:ServerInstance" = ".\SQLEXPRESS"
                     "Invoke-SqlCmd:Password" = "rocom"
                     "Invoke-SqlCmd:Username" = "sa"
+                    "Invoke-SqlCmd:TrustServerCertificate" = $true
                 }
                 $databases = Invoke-Sqlcmd "SELECT database_id, name FROM sys.databases WHERE database_id > 4" | ForEach-Object name
 
@@ -379,6 +381,7 @@ Process {
                     "Invoke-SqlCmd:ServerInstance" = ".\SQLEXPRESS"
                     "Invoke-SqlCmd:Password" = "rocom"
                     "Invoke-SqlCmd:Username" = "sa"
+                    "Invoke-SqlCmd:TrustServerCertificate" = $true
                 }
                 Invoke-Sqlcmd "SELECT database_id, name FROM sys.databases WHERE database_id > 4" | ForEach-Object {
                     Invoke-Sqlcmd "DROP DATABASE [$($_.name)];"
@@ -417,6 +420,7 @@ Process {
                     "Invoke-SqlCmd:ServerInstance" = ".\SQLEXPRESS"
                     "Invoke-SqlCmd:Password" = "rocom"
                     "Invoke-SqlCmd:Username" = "sa"
+                    "Invoke-SqlCmd:TrustServerCertificate" = $true
                 }'
 
                 New-Item "$env:USERPROFILE\Documents\PowerShell" -ItemType Directory -ErrorAction SilentlyContinue | Out-Null

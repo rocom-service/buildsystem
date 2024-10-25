@@ -41,7 +41,7 @@ $Gateway = Get-NetIPAddress -AddressFamily IPv4 |
 Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$Gateway -ScriptBlock {
     param($User,$Password,$VMName,$Gateway)
 
-    Rename-Computer $($VMName -replace " ","") -Force
+    Rename-Computer $($VMName -replace " ","") -Force -WarningAction Ignore
 
     $WindowsUpdatePath = "HKLM:SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\"
     $AutoUpdatePath = "HKLM:SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
@@ -61,7 +61,7 @@ Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$Gateway 
 
     # stop Windows Update Service
     while (!(Get-Service wuauserv)) { Start-Sleep 1 }
-    Stop-Service wuauserv
+    Stop-Service wuauserv -WarningAction Ignore
     Set-Service wuauserv -StartupType Disabled
 
     # remove Windows Update Servers
@@ -108,6 +108,7 @@ Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$Gateway 
                 -ServerAddresses "8.8.8.8","8.8.4.4"
         }
 
+
     # login without password
     Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "AutoAdminLogon" -Value "1" -Type String
     Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultUsername" -Value $User -Type String
@@ -129,9 +130,19 @@ Invoke-Command -Session $session -ArgumentList $User,$Password,$VMName,$Gateway 
     w32tm /unregister *>&1 | Out-Null
     w32tm /register   *>&1 | Out-Null
     net start w32time *>&1 | Out-Null
-
 }
 Write-Host '[done]' -ForegroundColor Green
+
+Write-Host "Checking internet connection " -ForegroundColor Cyan -NoNewline
+Invoke-Command -Session $session -ScriptBlock {
+    if (Get-NetRoute | Where-Object DestinationPrefix -eq '0.0.0.0/0' | Get-NetIPInterface | Where-Object ConnectionState -eq 'Connected') {
+        Write-Host '[done]' -ForegroundColor Green
+    } else {
+        Write-Host '[failed]' -ForegroundColor Red
+        exit
+    }
+}
+Invoke-Command -Session $session -ScriptBlock {}
 
 
 Write-Host "Setting System to german " -ForegroundColor Cyan -NoNewline

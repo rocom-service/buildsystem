@@ -1,4 +1,4 @@
-﻿#Requires -PSEdition Core
+#Requires -PSEdition Core
 #Requires -Module Hyper-V
 [CmdletBinding()]
 param (
@@ -49,7 +49,7 @@ New-VHD -Path "$ScriptRoot/Virtual Hard Disks/temp.vhdx" -SizeBytes $DiskSize -D
 New-VM -Name $VMName `
         -MemoryStartupBytes 3GB `
         -BootDevice VHD `
-        -SwitchName (Get-VMSwitch | Select-Object -First 1).Name | Out-Null
+        -SwitchName (Get-VMSwitch "Default Switch").Name | Out-Null
 Set-VM -Name $VMName `
         -AutomaticCheckpointsEnabled $false `
         -AutomaticStartAction Start `
